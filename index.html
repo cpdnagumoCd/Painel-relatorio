@@ -185,6 +185,11 @@ svg{display:block;}
 .assess-list li{position:relative;padding-left:20px;font-size:14.5px;color:var(--navy-deep);line-height:1.45;font-weight:500;}
 .assess-list li::before{content:"";position:absolute;left:2px;top:7px;width:8px;height:8px;border-radius:50%;background:var(--sev, var(--navy));}
 .assess-list li:first-child{font-weight:700;}
+.assess-obs{
+  margin-top:7px;font-size:13px;font-weight:500;font-style:italic;color:var(--navy-deep);
+  background:rgba(255,255,255,.75);border-left:3px solid var(--sev, var(--navy));border-radius:0 8px 8px 0;padding:6px 10px;
+}
+.assess-obs b{font-style:normal;font-weight:800;color:var(--sev-ink, var(--navy));}
 
 .kpi-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;}
 .kpi-card{
@@ -1803,7 +1808,12 @@ function renderAssess(){
   el.innerHTML =
     '<div class="assess-top"><span class="assess-label">Avaliação'+(state.dashMonth!=='all' ? ' · '+escapeHtml(monthLabel(state.dashMonth)) : '')+'</span>'+
     '<span class="assess-badge">'+escapeHtml(av.nivel.txt)+'</span></div>'+
-    '<ul class="assess-list">'+av.frases.map(f=>'<li>'+escapeHtml(f)+'</li>').join('')+'</ul>';
+    '<ul class="assess-list">'+av.frases.map((f,idx)=>
+      '<li>'+escapeHtml(f)+
+        // a 1ª frase é a da nota mais antiga: mostra a observação dela logo abaixo
+        (idx===0 && av.obsMaisAntiga ? '<div class="assess-obs"><b>Observação:</b> '+escapeHtml(av.obsMaisAntiga)+'</div>' : '')+
+      '</li>'
+    ).join('')+'</ul>';
 }
 
 function renderSeverity(){
@@ -2284,7 +2294,9 @@ function pdfAvaliacao(list, opts){
   } else if(n){
     frases.push('Nenhuma nota passou do prazo de '+state.prazoLimite+' dias.');
   }
-  return { nivel, frases, g, pend, atras };
+  // Observação da nota mais antiga (aparece logo abaixo da frase dela, no card e nos PDFs)
+  const obsMaisAntiga = maisAntiga ? getObs(maisAntiga).trim() : '';
+  return { nivel, frases, g, pend, atras, obsMaisAntiga };
 }
 
 function pdfKpis(av, extra){
@@ -2302,8 +2314,11 @@ function pdfKpis(av, extra){
 function pdfDrawAvaliacao(doc, x, y, w, av, kpis){
   const gap = 5, leftW = w*0.57, rightW = w - leftW - gap;
   pdfFont(doc,'normal',8.3);
-  const blocos = av.frases.map(f=>doc.splitTextToSize(f, leftW-17));
-  const textH = blocos.reduce((s,b)=>s+b.length*3.7+1.6, 0);
+  // itens = frases; a observação da nota mais antiga entra logo após a 1ª frase (sem marcador, em itálico)
+  const itens = av.frases.map(f=>({t:f}));
+  if(av.obsMaisAntiga) itens.splice(1, 0, {t:'Obs.: '+av.obsMaisAntiga, obs:true});
+  const blocos = itens.map(it=>{ pdfFont(doc, it.obs?'italic':'normal', it.obs?7.9:8.3); return Object.assign({lines:doc.splitTextToSize(it.t, leftW-(it.obs?21:17))}, it); });
+  const textH = blocos.reduce((s,b)=>s+b.lines.length*3.7+1.6, 0);
   const h = Math.max(42, 19 + textH + 3);
 
   pdfFill(doc, PDF_C.bg); doc.roundedRect(x, y, leftW, h, 2.5, 2.5, 'F');
@@ -2316,10 +2331,17 @@ function pdfDrawAvaliacao(doc, x, y, w, av, kpis){
   let ty = y + 21.5;
   pdfFont(doc,'normal',8.3);
   blocos.forEach(b=>{
-    pdfFill(doc, av.nivel.cor); doc.circle(x+8.3, ty-1.1, 0.7, 'F');
-    pdfInk(doc, PDF_C.ink);
-    b.forEach((ln,i)=>doc.text(ln, x+11, ty + i*3.7));
-    ty += b.length*3.7 + 1.6;
+    if(b.obs){
+      // observação da nota mais antiga: recuada, com filete na cor da situação
+      pdfFill(doc, av.nivel.cor); doc.rect(x+11, ty-2.9, 0.7, b.lines.length*3.7+0.4, 'F');
+      pdfFont(doc,'italic',7.9); pdfInk(doc, PDF_C.soft);
+      b.lines.forEach((ln,i)=>doc.text(ln, x+13.5, ty + i*3.7));
+    } else {
+      pdfFill(doc, av.nivel.cor); doc.circle(x+8.3, ty-1.1, 0.7, 'F');
+      pdfFont(doc,'normal',8.3); pdfInk(doc, PDF_C.ink);
+      b.lines.forEach((ln,i)=>doc.text(ln, x+11, ty + i*3.7));
+    }
+    ty += b.lines.length*3.7 + 1.6;
   });
 
   const kw = (rightW-gap)/2, kh = (h-gap)/2;
