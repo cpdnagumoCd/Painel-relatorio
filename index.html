@@ -142,6 +142,7 @@ svg{display:block;}
   background:var(--bg);border:1px solid var(--line);border-radius:99px;padding:5px 11px;white-space:nowrap;
 }
 .pill b{color:var(--navy-deep);}
+.pill:empty{display:none;}
 
 .grid-2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px;align-items:stretch;}
 .dash-row-a{grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);}
@@ -228,23 +229,34 @@ svg{display:block;}
 .sev-card-foot{display:flex;justify-content:space-between;gap:6px;font-size:11.5px;font-weight:700;color:var(--ink-soft);flex-wrap:wrap;}
 .sev-card-note{margin-top:6px;font-size:11px;font-weight:800;color:var(--sev-ink);background:var(--sev-tint);border-radius:6px;padding:3px 7px;align-self:flex-start;}
 
-/* ================= Matriz lojas × situação ================= */
-.heat-scroll{max-height:420px;}
-table.heat-table{width:100%;border-collapse:separate;border-spacing:0;font-size:12.5px;}
-.heat-table thead th{
-  position:sticky;top:0;z-index:1;background:#fff;color:var(--ink-soft);font-size:10.5px;font-weight:800;
-  letter-spacing:.05em;text-transform:uppercase;text-align:center;padding:9px 6px;border-bottom:1px solid var(--line);white-space:nowrap;
+/* ================= Ranking de lojas com notas em atraso ================= */
+.rank-list{display:flex;flex-direction:column;gap:6px;max-height:420px;overflow-y:auto;padding-right:6px;}
+.rank-item{
+  display:grid;grid-template-columns:30px minmax(0,1fr) 82px;gap:12px;align-items:center;
+  padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:#fff;cursor:pointer;
+  transition:border-color .12s ease,box-shadow .12s ease;
 }
-.heat-table thead th:first-child{text-align:left;padding-left:12px;}
-.heat-table thead th i{display:inline-block;width:8px;height:8px;border-radius:2px;background:var(--sev);margin-right:5px;vertical-align:0;}
-.heat-table tbody tr{cursor:pointer;}
-.heat-table tbody tr:hover td{filter:brightness(.97);}
-.heat-table tbody tr:hover td.heat-name{color:var(--navy);text-decoration:underline;}
-.heat-table td{padding:3px;border-bottom:1px solid var(--line-soft);text-align:center;}
-.heat-table td.heat-name{text-align:left;font-weight:700;color:var(--ink);padding:8px 10px 8px 12px;white-space:nowrap;max-width:190px;overflow:hidden;text-overflow:ellipsis;}
-.heat-cell{display:block;border-radius:7px;padding:6px 4px;font-weight:800;font-variant-numeric:tabular-nums;color:var(--ink);}
-.heat-cell.is-zero{color:#C9D3DC;font-weight:600;}
-.heat-max{font-weight:800;font-variant-numeric:tabular-nums;white-space:nowrap;}
+.rank-item:hover{border-color:var(--navy);box-shadow:var(--shadow-sm);}
+.rank-pos{
+  width:30px;height:30px;border-radius:9px;display:flex;align-items:center;justify-content:center;
+  font-size:13px;font-weight:800;background:var(--bg);color:var(--ink-soft);
+}
+.rank-item:nth-child(-n+3) .rank-pos{background:var(--sev);color:var(--sev-on);}
+.rank-body{min-width:0;display:flex;flex-direction:column;gap:6px;}
+.rank-top{display:flex;justify-content:space-between;align-items:baseline;gap:10px;}
+.rank-name{font-size:13px;font-weight:800;color:var(--navy-deep);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.rank-total{font-size:12px;font-weight:800;color:var(--ink);white-space:nowrap;}
+.rank-total b{font-size:15px;color:var(--sev-ink);}
+.rank-track{display:flex;height:9px;border-radius:99px;overflow:hidden;background:var(--bg);}
+.rank-track span{height:100%;background:var(--sev);}
+.rank-split{display:flex;gap:12px;font-size:11px;font-weight:700;color:var(--ink-soft);}
+.rank-split span{display:flex;align-items:center;gap:5px;}
+.rank-split i{width:8px;height:8px;border-radius:2px;background:var(--sev);display:block;}
+.rank-max{
+  text-align:center;border-radius:8px;padding:5px 4px;background:var(--sev-tint);color:var(--sev-ink);line-height:1.1;
+}
+.rank-max b{display:block;font-size:16px;font-weight:800;font-variant-numeric:tabular-nums;}
+.rank-max span{font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.03em;white-space:nowrap;}
 
 /* ================= Fila de prioridade ================= */
 .queue{display:flex;flex-direction:column;gap:8px;max-height:420px;overflow-y:auto;padding-right:6px;}
@@ -724,10 +736,11 @@ details.master-details[open] summary{margin-bottom:14px;}
             <div class="card-head">
               <div>
                 <h3 class="card-title">Lojas com notas em atraso</h3>
-                <p class="card-subtitle">Quantidade de notas em cada faixa. Quanto mais forte a cor, mais notas. Clique na loja para ver as notas.</p>
+                <p class="card-subtitle">Ranking por quantidade de notas em atraso (alto e recente). Clique na loja para ver as notas.</p>
               </div>
+              <span class="pill" id="lojas-ranking-count"></span>
             </div>
-            <div class="table-scroll heat-scroll" id="heat-wrap"></div>
+            <div class="rank-list" id="lojas-ranking"></div>
           </div>
 
           <div class="card">
@@ -1766,8 +1779,6 @@ function renderMonthFilter(){
 
 /* Faixas de situação do dashboard — as mesmas dos PDFs (PDF_GRUPOS / pdfGrupo) */
 const SEV_IDS = ['critico','alto','recente','prazo','semdata'];
-const sevRGBA = (id, a)=>{ const c = PDF_GRUPO[id].cor; return 'rgba('+c[0]+','+c[1]+','+c[2]+','+a+')'; };
-const sevInk = id=>{ const c = PDF_GRUPO[id].ink; return 'rgb('+c[0]+','+c[1]+','+c[2]+')'; };
 
 // Situação de um dia de emissão (todas as notas do mesmo dia têm o mesmo atraso)
 function sevDoDia(d){
@@ -1840,33 +1851,38 @@ function renderSeverity(){
   }).join('');
 }
 
-function renderHeatmap(){
-  const wrap = document.getElementById('heat-wrap');
-  const cols = ['critico','alto','recente','prazo'];
+// Ranking das lojas com notas em atraso (atraso alto e recente; crítico também entra, se houver)
+function renderLojasRanking(){
+  const el = document.getElementById('lojas-ranking');
+  const ATRASO = ['critico','alto','recente'];
   const map = new Map();
-  state.dash.invoices.forEach(i=>{
+  state.dash.av.atras.forEach(i=>{
     let r = map.get(i.nomeDestinatario);
-    if(!r){ r = {nome:i.nomeDestinatario, critico:0, alto:0, recente:0, prazo:0, semdata:0, maxAtraso:0}; map.set(i.nomeDestinatario, r); }
-    r[pdfGrupo(i)]++;
-    if(i.emAtraso && i.diasEmAtraso > r.maxAtraso) r.maxAtraso = i.diasEmAtraso;
+    if(!r){ r = {nome:i.nomeDestinatario, total:0, critico:0, alto:0, recente:0, maxAtraso:0}; map.set(i.nomeDestinatario, r); }
+    r.total++; r[pdfGrupo(i)]++;
+    if(i.diasEmAtraso > r.maxAtraso) r.maxAtraso = i.diasEmAtraso;
   });
-  const rows = [...map.values()].filter(r=>r.critico+r.alto+r.recente>0)
-    .sort((a,b)=> b.critico-a.critico || b.alto-a.alto || b.recente-a.recente || b.maxAtraso-a.maxAtraso);
-  if(!rows.length){ wrap.innerHTML = '<p class="empty-note">Nenhuma loja com notas em atraso. 🎉</p>'; return; }
-  const max = {}; cols.forEach(c=> max[c] = Math.max(1, ...rows.map(r=>r[c])));
-  const sevMax = d => d>=21 ? 'critico' : d>=8 ? 'alto' : 'recente';
-  wrap.innerHTML = '<table class="heat-table"><thead><tr><th>Loja</th>'+
-    cols.map(c=>'<th class="sev--'+c+'"><i></i>'+escapeHtml(c==='prazo'?'No prazo':PDF_GRUPO[c].titulo.replace('Atraso ',''))+'</th>').join('')+
-    '<th>Maior atraso</th></tr></thead><tbody>'+
-    rows.map(r=>'<tr data-loja="'+escapeHtml(r.nome)+'"><td class="heat-name" title="'+escapeHtml(r.nome)+'">'+escapeHtml(r.nome)+'</td>'+
-      cols.map(c=>{
-        const v = r[c];
-        if(!v) return '<td><span class="heat-cell is-zero">0</span></td>';
-        const a = c==='prazo' ? 0.12 + 0.28*(v/max[c]) : 0.18 + 0.72*(v/max[c]);
-        return '<td><span class="heat-cell" style="background:'+sevRGBA(c,a.toFixed(2))+';color:'+(a>0.55 && c!=='recente'?'#fff':'var(--navy-deep)')+'">'+fmtInt(v)+'</span></td>';
-      }).join('')+
-      '<td><span class="heat-max" style="color:'+sevInk(sevMax(r.maxAtraso))+'">'+fmtInt(r.maxAtraso)+'d</span></td></tr>'
-    ).join('')+'</tbody></table>';
+  const rows = [...map.values()].sort((a,b)=> b.total-a.total || b.maxAtraso-a.maxAtraso || a.nome.localeCompare(b.nome,'pt-BR',{numeric:true}));
+  document.getElementById('lojas-ranking-count').textContent = rows.length ? fmtInt(rows.length)+' loja(s)' : '';
+  if(!rows.length){ el.innerHTML = '<p class="empty-note">Nenhuma loja com notas em atraso. 🎉</p>'; return; }
+  const max = Math.max(...rows.map(r=>r.total));
+  el.innerHTML = rows.map((r,idx)=>{
+    const pior = r.critico ? 'critico' : r.alto ? 'alto' : 'recente';   // cor da loja = pior situação dela
+    return '<div class="rank-item sev--'+pior+'" data-loja="'+escapeHtml(r.nome)+'" title="Ver as notas em atraso de '+escapeHtml(r.nome)+'">'+
+      '<span class="rank-pos">'+(idx+1)+'</span>'+
+      '<div class="rank-body">'+
+        '<div class="rank-top"><span class="rank-name">'+escapeHtml(r.nome)+'</span>'+
+          '<span class="rank-total"><b>'+fmtInt(r.total)+'</b> '+(r.total===1?'nota':'notas')+' em atraso</span></div>'+
+        '<div class="rank-track" style="width:'+(r.total/max*100).toFixed(1)+'%">'+
+          ATRASO.map(id=> r[id] ? '<span class="sev--'+id+'" style="width:'+(r[id]/r.total*100).toFixed(2)+'%"></span>' : '').join('')+
+        '</div>'+
+        '<div class="rank-split">'+
+          ATRASO.filter(id=>id!=='critico' || r.critico).map(id=>'<span class="sev--'+id+'"><i></i>'+fmtInt(r[id])+' '+(id==='critico'?'crítico':id)+'</span>').join('')+
+        '</div>'+
+      '</div>'+
+      '<div class="rank-max"><b>'+fmtInt(r.maxAtraso)+'d</b><span>maior atraso</span></div>'+
+    '</div>';
+  }).join('');
 }
 
 function renderQueue(){
@@ -1926,7 +1942,7 @@ function renderDashboardTab(){
   renderKPIs();
   renderAssess();
   renderSeverity();
-  renderHeatmap();
+  renderLojasRanking();
   renderQueue();
   renderDayChart();
   renderCompanies();
@@ -3307,7 +3323,7 @@ document.getElementById('dash-month').addEventListener('change', e=>{
 document.getElementById('dashboard-content').addEventListener('click', e=>{
   const sev = e.target.closest('[data-sev]');
   if(sev){ goToNotas({status: sev.dataset.sev==='prazo' ? 'prazo' : sev.dataset.sev}); return; }
-  const loja = e.target.closest('tr[data-loja]');
+  const loja = e.target.closest('[data-loja]');
   if(loja){ goToNotas({loja: loja.dataset.loja, status:'atraso'}); return; }
   const emp = e.target.closest('.bar-row[data-empresa]:not(.is-zero)');
   if(emp){ goToNotas({empresa: emp.dataset.empresa}); return; }
