@@ -147,38 +147,44 @@ svg{display:block;}
 .dash-row-a{grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);}
 .dash-row-b{grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);}
 
-/* ================= Dashboard — cores por situação (mesmas dos PDFs) ================= */
+/* ================= Dashboard — cores por situação (mesmas dos PDFs) =================
+   vermelho = atraso alto/crítico · amarelo = atraso recente · azul = no prazo
+   --sev = preenchimento · --sev-ink = texto sobre branco · --sev-on = texto sobre a cor */
 :root{
-  --sev-critico:#7A0026; --sev-critico-tint:#FBE7EC;
-  --sev-alto:#D60034;    --sev-alto-tint:#FDEAF0;
-  --sev-recente:#E26C0A; --sev-recente-tint:#FDF0E4;
-  --sev-prazo:#0E8B81;   --sev-prazo-tint:#E3FBF8;
-  --sev-semdata:#93A6B8; --sev-semdata-tint:#EEF2F5;
+  --sev-critico:#9E0027; --sev-critico-ink:#9E0027; --sev-critico-tint:#FBE7EC;
+  --sev-alto:#D60034;    --sev-alto-ink:#D60034;    --sev-alto-tint:#FDEAF0;
+  --sev-recente:#F2B705; --sev-recente-ink:#8C6200; --sev-recente-tint:#FFF6D6;
+  --sev-prazo:#0B5CAD;   --sev-prazo-ink:#0B5CAD;   --sev-prazo-tint:#E6F0FA;
+  --sev-semdata:#93A6B8; --sev-semdata-ink:#6E8092; --sev-semdata-tint:#EEF2F5;
 }
-.sev--critico{--sev:var(--sev-critico);--sev-tint:var(--sev-critico-tint);}
-.sev--alto{--sev:var(--sev-alto);--sev-tint:var(--sev-alto-tint);}
-.sev--recente{--sev:var(--sev-recente);--sev-tint:var(--sev-recente-tint);}
-.sev--prazo{--sev:var(--sev-prazo);--sev-tint:var(--sev-prazo-tint);}
-.sev--semdata{--sev:var(--sev-semdata);--sev-tint:var(--sev-semdata-tint);}
+.sev--critico{--sev:var(--sev-critico);--sev-ink:var(--sev-critico-ink);--sev-tint:var(--sev-critico-tint);--sev-on:#fff;}
+.sev--alto{--sev:var(--sev-alto);--sev-ink:var(--sev-alto-ink);--sev-tint:var(--sev-alto-tint);--sev-on:#fff;}
+.sev--recente{--sev:var(--sev-recente);--sev-ink:var(--sev-recente-ink);--sev-tint:var(--sev-recente-tint);--sev-on:var(--navy-deep);}
+.sev--prazo{--sev:var(--sev-prazo);--sev-ink:var(--sev-prazo-ink);--sev-tint:var(--sev-prazo-tint);--sev-on:#fff;}
+.sev--semdata{--sev:var(--sev-semdata);--sev-ink:var(--sev-semdata-ink);--sev-tint:var(--sev-semdata-tint);--sev-on:#fff;}
 
-/* ================= Avaliação + indicadores ================= */
+/* ================= Avaliação (card em destaque) + indicadores ================= */
 .dash-hero{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:20px;align-items:stretch;}
 .assess{
-  --sev:var(--navy);--sev-tint:var(--navy-tint);
-  position:relative;background:var(--card);border:1px solid var(--line);border-radius:var(--radius-lg);
-  box-shadow:var(--shadow-sm);padding:20px 22px 18px 26px;overflow:hidden;min-width:0;
+  position:relative;min-width:0;overflow:hidden;
+  background:linear-gradient(135deg, var(--sev-tint, var(--navy-tint)) 0%, #fff 70%);
+  border:1.5px solid var(--sev, var(--navy));border-radius:var(--radius-lg);
+  box-shadow:0 16px 34px -20px var(--sev, var(--navy));
+  padding:22px 24px 20px 30px;
 }
-.assess::before{content:"";position:absolute;left:0;top:0;bottom:0;width:5px;background:var(--sev);}
-.assess-top{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px;flex-wrap:wrap;}
-.assess-label{font-size:11px;font-weight:800;letter-spacing:.09em;text-transform:uppercase;color:var(--ink-soft);}
+.assess::before{content:"";position:absolute;left:0;top:0;bottom:0;width:8px;background:var(--sev, var(--navy));}
+.assess-top{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px;flex-wrap:wrap;}
+.assess-label{font-size:11.5px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--sev-ink, var(--navy));}
 .assess-badge{
-  display:inline-flex;align-items:center;gap:7px;background:var(--sev);color:#fff;
-  font-size:12.5px;font-weight:800;letter-spacing:.06em;padding:6px 14px;border-radius:99px;
+  display:inline-flex;align-items:center;gap:8px;background:var(--sev, var(--navy));color:var(--sev-on, #fff);
+  font-size:14px;font-weight:800;letter-spacing:.07em;padding:8px 18px;border-radius:99px;
+  box-shadow:0 6px 14px -8px var(--sev, var(--navy));
 }
-.assess-badge::before{content:"";width:7px;height:7px;border-radius:50%;background:#fff;opacity:.85;}
-.assess-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:9px;}
-.assess-list li{position:relative;padding-left:18px;font-size:13.5px;color:var(--ink);line-height:1.45;}
-.assess-list li::before{content:"";position:absolute;left:2px;top:7px;width:7px;height:7px;border-radius:50%;background:var(--sev);}
+.assess-badge::before{content:"";width:8px;height:8px;border-radius:50%;background:currentColor;opacity:.85;}
+.assess-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:10px;}
+.assess-list li{position:relative;padding-left:20px;font-size:14.5px;color:var(--navy-deep);line-height:1.45;font-weight:500;}
+.assess-list li::before{content:"";position:absolute;left:2px;top:7px;width:8px;height:8px;border-radius:50%;background:var(--sev, var(--navy));}
+.assess-list li:first-child{font-weight:700;}
 
 .kpi-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;}
 .kpi-card{
@@ -210,12 +216,12 @@ svg{display:block;}
 .sev-card:focus-visible{outline:2.5px solid var(--sev);outline-offset:2px;}
 .sev-card.is-hot{background:var(--sev-tint);}
 .sev-card.is-empty{opacity:.55;}
-.sev-card-title{font-size:12.5px;font-weight:800;color:var(--sev);display:flex;align-items:center;gap:6px;}
+.sev-card-title{font-size:12.5px;font-weight:800;color:var(--sev-ink);display:flex;align-items:center;gap:6px;}
 .sev-card-desc{font-size:11.5px;color:var(--ink-soft);font-weight:600;}
 .sev-card-value{font-size:30px;font-weight:800;color:var(--navy-deep);font-variant-numeric:tabular-nums;line-height:1.1;margin:6px 0 2px;}
-.sev-card.is-hot .sev-card-value{color:var(--sev);}
+.sev-card.is-hot .sev-card-value{color:var(--sev-ink);}
 .sev-card-foot{display:flex;justify-content:space-between;gap:6px;font-size:11.5px;font-weight:700;color:var(--ink-soft);flex-wrap:wrap;}
-.sev-card-note{margin-top:6px;font-size:11px;font-weight:800;color:var(--sev);background:var(--sev-tint);border-radius:6px;padding:3px 7px;align-self:flex-start;}
+.sev-card-note{margin-top:6px;font-size:11px;font-weight:800;color:var(--sev-ink);background:var(--sev-tint);border-radius:6px;padding:3px 7px;align-self:flex-start;}
 
 /* ================= Matriz lojas × situação ================= */
 .heat-scroll{max-height:420px;}
@@ -238,7 +244,7 @@ table.heat-table{width:100%;border-collapse:separate;border-spacing:0;font-size:
 /* ================= Fila de prioridade ================= */
 .queue{display:flex;flex-direction:column;gap:8px;max-height:420px;overflow-y:auto;padding-right:6px;}
 .q-item{display:flex;gap:12px;align-items:stretch;border:1px solid var(--line);border-left:4px solid var(--sev);border-radius:10px;padding:9px 12px 9px 10px;background:#fff;}
-.q-days{flex:none;width:54px;border-radius:8px;background:var(--sev-tint);color:var(--sev);display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1;}
+.q-days{flex:none;width:54px;border-radius:8px;background:var(--sev-tint);color:var(--sev-ink);display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1;}
 .q-days b{font-size:20px;font-weight:800;font-variant-numeric:tabular-nums;}
 .q-days span{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;margin-top:3px;}
 .q-body{min-width:0;flex:1;display:flex;flex-direction:column;gap:3px;}
@@ -1756,6 +1762,7 @@ function renderMonthFilter(){
 /* Faixas de situação do dashboard — as mesmas dos PDFs (PDF_GRUPOS / pdfGrupo) */
 const SEV_IDS = ['critico','alto','recente','prazo','semdata'];
 const sevRGBA = (id, a)=>{ const c = PDF_GRUPO[id].cor; return 'rgba('+c[0]+','+c[1]+','+c[2]+','+a+')'; };
+const sevInk = id=>{ const c = PDF_GRUPO[id].ink; return 'rgb('+c[0]+','+c[1]+','+c[2]+')'; };
 
 // Situação de um dia de emissão (todas as notas do mesmo dia têm o mesmo atraso)
 function sevDoDia(d){
@@ -1790,7 +1797,7 @@ function renderKPIs(){
 
 function renderAssess(){
   const av = state.dash.av;
-  const cls = {'CRÍTICO':'critico','ATENÇÃO':'alto','SOB CONTROLE':'recente'}[av.nivel.txt] || 'prazo';
+  const cls = av.nivel.id;   // cor do card = situação da nota mais antiga em aberto
   const el = document.getElementById('dash-assess');
   el.className = 'assess sev--'+cls;
   el.innerHTML =
@@ -1846,9 +1853,9 @@ function renderHeatmap(){
         const v = r[c];
         if(!v) return '<td><span class="heat-cell is-zero">0</span></td>';
         const a = c==='prazo' ? 0.12 + 0.28*(v/max[c]) : 0.18 + 0.72*(v/max[c]);
-        return '<td><span class="heat-cell" style="background:'+sevRGBA(c,a.toFixed(2))+';color:'+(a>0.55?'#fff':'var(--ink)')+'">'+fmtInt(v)+'</span></td>';
+        return '<td><span class="heat-cell" style="background:'+sevRGBA(c,a.toFixed(2))+';color:'+(a>0.55 && c!=='recente'?'#fff':'var(--navy-deep)')+'">'+fmtInt(v)+'</span></td>';
       }).join('')+
-      '<td><span class="heat-max" style="color:'+sevRGBA(sevMax(r.maxAtraso),1)+'">'+fmtInt(r.maxAtraso)+'d</span></td></tr>'
+      '<td><span class="heat-max" style="color:'+sevInk(sevMax(r.maxAtraso))+'">'+fmtInt(r.maxAtraso)+'d</span></td></tr>'
     ).join('')+'</tbody></table>';
 }
 
@@ -2196,12 +2203,13 @@ const PDF_C = {
   bg:[243,246,248], zebra:[248,250,252], navy:[0,56,101], teal:[14,139,129], red:[214,0,52]
 };
 const PDF_GRUPOS = [
-  {id:'critico',  titulo:'Crítico',            desc:()=> '21 dias ou mais de atraso',          cor:[122,0,38],   tint:[252,233,238]},
-  {id:'alto',     titulo:'Atraso alto',        desc:()=> '8 a 20 dias de atraso',              cor:[214,0,52]},
-  {id:'recente',  titulo:'Atraso recente',     desc:()=> '1 a 7 dias de atraso',               cor:[226,108,10]},
-  {id:'prazo',    titulo:'No prazo',           desc:()=> 'até '+state.prazoLimite+' dias desde a emissão', cor:[14,139,129]},
-  {id:'semdata',  titulo:'Sem data de emissão',desc:()=> 'não é possível calcular o prazo',    cor:[147,166,184]},
-  {id:'resolvida',titulo:'Resolvidas',         desc:()=> 'saíram da base bruta',               cor:[0,56,101]}
+  // cor = preenchimento · ink = texto sobre fundo branco · on = texto sobre a cor
+  {id:'critico',  titulo:'Crítico',            desc:()=> '21 dias ou mais de atraso',          cor:[158,0,39],  ink:[158,0,39],  on:[255,255,255], tint:[252,233,238]},
+  {id:'alto',     titulo:'Atraso alto',        desc:()=> '8 a 20 dias de atraso',              cor:[214,0,52],  ink:[214,0,52],  on:[255,255,255]},
+  {id:'recente',  titulo:'Atraso recente',     desc:()=> '1 a 7 dias de atraso',               cor:[242,183,5], ink:[140,98,0],  on:[0,31,56]},
+  {id:'prazo',    titulo:'No prazo',           desc:()=> 'até '+state.prazoLimite+' dias desde a emissão', cor:[11,92,173], ink:[11,92,173], on:[255,255,255]},
+  {id:'semdata',  titulo:'Sem data de emissão',desc:()=> 'não é possível calcular o prazo',    cor:[147,166,184], ink:[110,128,146], on:[255,255,255]},
+  {id:'resolvida',titulo:'Resolvidas',         desc:()=> 'saíram da base bruta',               cor:[14,139,129], ink:[14,139,129], on:[255,255,255]}
 ];
 const PDF_GRUPO = Object.fromEntries(PDF_GRUPOS.map(g=>[g.id,g]));
 const pdfFill = (doc,c)=>doc.setFillColor(c[0],c[1],c[2]);
@@ -2248,12 +2256,11 @@ function pdfAvaliacao(list, opts){
   const atras = pend.filter(i=>i.emAtraso);
   const g = pdfAgrupar(list);
   const n = pend.length;
-  let nivel;
-  if(!n) nivel = {txt:'SEM PENDÊNCIAS', cor:PDF_C.teal};
-  else if(!atras.length) nivel = {txt:'EM DIA', cor:PDF_C.teal};
-  else if(g.critico.length && g.critico.length/n >= 0.10) nivel = {txt:'CRÍTICO', cor:PDF_GRUPO.critico.cor};
-  else if(g.critico.length || atras.length/n >= 0.30) nivel = {txt:'ATENÇÃO', cor:PDF_GRUPO.alto.cor};
-  else nivel = {txt:'SOB CONTROLE', cor:PDF_GRUPO.recente.cor};
+  // Selo e cor seguem a nota mais antiga em aberto: crítico/alto = vermelho, recente = amarelo, no prazo = azul
+  const maisAntigaAberta = atras.slice().sort(byMostOverdue)[0];
+  const gid = maisAntigaAberta ? pdfGrupo(maisAntigaAberta) : 'prazo';
+  const SELO = {critico:'CRÍTICO', alto:'ATRASO ALTO', recente:'ATENÇÃO', prazo: n ? 'EM DIA' : 'SEM PENDÊNCIAS'};
+  const nivel = {id:gid, txt:SELO[gid], cor:PDF_GRUPO[gid].cor, on:PDF_GRUPO[gid].on};
 
   const frases = [];
   const maisAntiga = atras.slice().sort(byMostOverdue)[0];
@@ -2305,7 +2312,7 @@ function pdfDrawAvaliacao(doc, x, y, w, av, kpis){
   pdfFont(doc,'bold',8.4);
   const pillW = doc.getTextWidth(av.nivel.txt)+12;
   pdfFill(doc, av.nivel.cor); doc.roundedRect(x+7, y+9.3, pillW, 6.6, 3.3, 3.3, 'F');
-  pdfInk(doc, [255,255,255]); doc.text(av.nivel.txt, x+7+pillW/2, y+13.9, {align:'center'});
+  pdfInk(doc, av.nivel.on); doc.text(av.nivel.txt, x+7+pillW/2, y+13.9, {align:'center'});
   let ty = y + 21.5;
   pdfFont(doc,'normal',8.3);
   blocos.forEach(b=>{
@@ -2342,7 +2349,7 @@ function pdfDrawDistribuicao(doc, x, y, w, g, ids){
     pdfFill(doc, it.g.cor); doc.rect(bx, y, sw, barH, 'F');
     pdfFont(doc,'bold',7);
     const lbl = fmtInt(it.n);
-    if(sw > doc.getTextWidth(lbl)+4){ pdfInk(doc,[255,255,255]); doc.text(lbl, bx+sw/2, y+5, {align:'center'}); }
+    if(sw > doc.getTextWidth(lbl)+4){ pdfInk(doc, it.g.on); doc.text(lbl, bx+sw/2, y+5, {align:'center'}); }
     bx += sw;
   });
   y += barH + 5;
@@ -2370,11 +2377,11 @@ const PDF_COLS = {
   emissao:   {label:'Emissão', w:21, cell:i=>({text:i.dataEmissaoFmt})},
   situacao:  {label:'Atraso / prazo', w:24, align:'right', cell:i=>{
     const g = PDF_GRUPO[pdfGrupo(i)];
-    if(i.resolvida) return {text:'resolvida '+(i.resolvidaEm?formatDateBR(i.resolvidaEm).slice(0,5):''), color:g.cor, bold:true};
+    if(i.resolvida) return {text:'resolvida '+(i.resolvidaEm?formatDateBR(i.resolvidaEm).slice(0,5):''), color:g.ink, bold:true};
     if(!i.dataEmissao) return {text:'—', color:PDF_C.faint};
-    if(i.emAtraso) return {text:fmtInt(i.diasEmAtraso)+(i.diasEmAtraso===1?' dia':' dias'), color:g.cor, bold:true, size:i.diasEmAtraso>=21?8.6:7.8};
+    if(i.emAtraso) return {text:fmtInt(i.diasEmAtraso)+(i.diasEmAtraso===1?' dia':' dias'), color:g.ink, bold:true, size:i.diasEmAtraso>=21?8.6:7.8};
     const falta = state.prazoLimite - i.diasDesdeEmissao;
-    return {text: falta<=0 ? 'vence hoje' : 'vence em '+falta+'d', color:g.cor, bold:falta<=0};
+    return {text: falta<=0 ? 'vence hoje' : 'vence em '+falta+'d', color:g.ink, bold:falta<=0};
   }},
   valor:     {label:'Valor (R$)', w:22, align:'right', cell:i=>({text:i.valor!=null ? fmtMoney(i.valor).replace('R$','').trim() : '—'})},
   obs:       {label:'Observação', w:0, wrap:true, cell:i=>{ const o=getObs(i).trim(); return o ? {text:o} : {text:'—', color:[200,208,216]}; }}
@@ -2389,7 +2396,7 @@ function pdfDrawSecoes(doc, o){
   let y = o.y;
   const band = (g, lista, cont)=>{
     pdfFill(doc, g.cor); doc.roundedRect(o.x, y, o.width, BAND_H, 1.6, 1.6, 'F');
-    pdfFont(doc,'bold',8.8); pdfInk(doc,[255,255,255]);
+    pdfFont(doc,'bold',8.8); pdfInk(doc, g.on);
     doc.text(g.titulo.toUpperCase()+(cont?'  (continuação)':''), o.x+4, y+5.4);
     const tw = doc.getTextWidth(g.titulo.toUpperCase()+(cont?'  (continuação)':''));
     pdfFont(doc,'normal',7.6); doc.text('·  '+g.desc(), o.x+4+tw+3, y+5.4);
@@ -2518,14 +2525,14 @@ function buildDashboardPDF(){
   const maxL = Math.max(1, ...lojas.map(s=>s.emAtraso));
   if(!lojas.length){ pdfFont(doc,'normal',8); pdfInk(doc,PDF_C.faint); doc.text('Nenhuma loja com notas em atraso.', marginX, ly+4); }
   lojas.forEach((s,i)=>{
-    const sev = s.maxDias-state.prazoLimite >= 21 ? PDF_GRUPO.critico.cor : s.maxDias-state.prazoLimite >= 8 ? PDF_GRUPO.alto.cor : PDF_GRUPO.recente.cor;
+    const sevG = PDF_GRUPO[s.maxDias-state.prazoLimite >= 21 ? 'critico' : s.maxDias-state.prazoLimite >= 8 ? 'alto' : 'recente'];
     pdfFont(doc,'bold',7.2); pdfInk(doc, PDF_C.soft); doc.text(String(i+1), marginX+2, ly+4.1);
     pdfFont(doc,'bold',7.6); pdfInk(doc, PDF_C.ink); doc.text(pdfTruncate(doc, s.nome, 44), marginX+7, ly+4.1);
     const bx = marginX+53, bw = colW-53-30;
     pdfFill(doc, PDF_C.bg); doc.roundedRect(bx, ly+1.6, bw, 3.2, 1, 1, 'F');
-    pdfFill(doc, sev); doc.roundedRect(bx, ly+1.6, Math.max(1.5, s.emAtraso/maxL*bw), 3.2, 1, 1, 'F');
+    pdfFill(doc, sevG.cor); doc.roundedRect(bx, ly+1.6, Math.max(1.5, s.emAtraso/maxL*bw), 3.2, 1, 1, 'F');
     pdfFont(doc,'bold',7.6); pdfInk(doc, PDF_C.ink); doc.text(fmtInt(s.emAtraso), marginX+colW-15, ly+4.1, {align:'right'});
-    pdfFont(doc,'bold',7.4); pdfInk(doc, sev); doc.text(fmtInt(s.maxDias-state.prazoLimite)+'d', marginX+colW, ly+4.1, {align:'right'});
+    pdfFont(doc,'bold',7.4); pdfInk(doc, sevG.ink); doc.text(fmtInt(s.maxDias-state.prazoLimite)+'d', marginX+colW, ly+4.1, {align:'right'});
     ly += rowH;
   });
 
