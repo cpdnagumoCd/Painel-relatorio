@@ -2188,22 +2188,133 @@ function byMostOverdue(a,b){
          (b.diasDesdeEmissao==null?-1:b.diasDesdeEmissao)-(a.diasDesdeEmissao==null?-1:a.diasDesdeEmissao);
 }
 
+/* ---------- Tabela de notas para PDF (usada nos relatórios de notas e de loja) ----------
+   Cada nota é uma linha; a coluna Observação quebra o texto dentro da própria célula
+   e a linha cresce só o necessário. Gravidade do atraso = faixa colorida à esquerda. */
+function pdfTruncate(doc, text, maxW){
+  text = String(text==null?'':text);
+  if(doc.getTextWidth(text) <= maxW) return text;
+  while(text.length > 1 && doc.getTextWidth(text+'…') > maxW) text = text.slice(0,-1);
+  return text.trimEnd()+'…';
+}
+function pdfSeverityColor(inv){
+  if(!inv.emAtraso) return null;
+  if(inv.diasEmAtraso >= 21) return [214,0,52];
+  if(inv.diasEmAtraso >= 8) return [236,124,151];
+  return null;
+}
+function pdfStatusCell(inv){
+  if(inv.resolvida) return {text:'Resolvida', color:[0,56,101], bold:true};
+  if(inv.emAtraso) return {text:'Em atraso', color:[214,0,52], bold:true};
+  if(!inv.dataEmissao) return {text:'Sem data', color:[140,160,179], bold:true};
+  return {text:'No prazo', color:[14,139,129], bold:true};
+}
+// Colunas prontas; a Observação ocupa a largura que sobrar
+const PDF_COLS = {
+  nota:      {label:'Nota', w:21, cell:i=>({text:i.numeroNF, bold:true})},
+  loja:      {label:'Loja', w:42, cell:i=>({text:i.nomeDestinatario})},
+  remetente: {label:'Remetente', w:40, cell:i=>({text:i.nomeRemetente})},
+  emissao:   {label:'Emissão', w:19, cell:i=>({text:i.dataEmissaoFmt})},
+  dias:      {label:'Dias', w:11, align:'right', cell:i=>({text:i.diasDesdeEmissao!=null?String(i.diasDesdeEmissao):'—'})},
+  status:    {label:'Status', w:20, cell:pdfStatusCell},
+  atraso:    {label:'Atraso', w:15, align:'right', cell:i=>i.emAtraso ? {text:fmtInt(i.diasEmAtraso)+'d', color:[214,0,52], bold:true} : {text:'—', color:[140,160,179]}},
+  valor:     {label:'Valor (R$)', w:23, align:'right', cell:i=>({text:i.valor!=null ? fmtMoney(i.valor).replace('R$','').trim() : '—'})},
+  obs:       {label:'Observação', w:0, wrap:true, cell:i=>{ const o=getObs(i).trim(); return o ? {text:o} : {text:'—', color:[190,200,210]}; }}
+};
+
+function drawPdfNotesTable(doc, o){
+  // o: {x, y, width, cols:[...], rows, pageH, headerFill, onNewPage:()=>novoY}
+  const FS = 7.6, LINE = 3.25, PAD = 1.8, HEAD_H = 7.2, BOTTOM = 14;
+  const fixed = o.cols.reduce((s,c)=>s+(c.w||0),0);
+  const cols = o.cols.map(c=> c.w ? c : Object.assign({}, c, {w: o.width - fixed}));
+  const drawHeader = yy=>{
+    doc.setFillColor(o.headerFill[0],o.headerFill[1],o.headerFill[2]);
+    doc.rect(o.x, yy, o.width, HEAD_H, 'F');
+    doc.setFont('helvetica','bold'); doc.setFontSize(7.4); doc.setTextColor(255,255,255);
+    let cx = o.x;
+    cols.forEach(c=>{
+      if(c.align==='right') doc.text(c.label, cx+c.w-2, yy+4.8, {align:'right'});
+      else doc.text(c.label, cx+2.4, yy+4.8);
+      cx += c.w;
+    });
+    return yy + HEAD_H;
+  };
+  let y = drawHeader(o.y);
+  o.rows.forEach((inv, idx)=>{
+    // monta as células (com quebra só na observação) para saber a altura da linha
+    const cells = cols.map(c=>{
+      const v = c.cell(inv);
+      doc.setFont('helvetica', v.bold?'bold':'normal'); doc.setFontSize(FS);
+      const lines = c.wrap ? doc.splitTextToSize(String(v.text), c.w-4.4) : [pdfTruncate(doc, v.text, c.w-4.4)];
+      return {c, v, lines};
+    });
+    const nLines = Math.max(...cells.map(k=>k.lines.length));
+    const rowH = Math.max(6.4, nLines*LINE + PAD*2);
+    if(y + rowH > o.pageH - BOTTOM){ y = drawHeader(o.onNewPage()); }
+    if(idx % 2 === 1){ doc.setFillColor(247,249,251); doc.rect(o.x, y, o.width, rowH, 'F'); }
+    const sev = pdfSeverityColor(inv);
+    if(sev){ doc.setFillColor(sev[0],sev[1],sev[2]); doc.rect(o.x, y, 1.1, rowH, 'F'); }
+    let cx = o.x;
+    cells.forEach(({c, v, lines})=>{
+      doc.setFont('helvetica', v.bold?'bold':'normal'); doc.setFontSize(FS);
+      const col = v.color || [11,37,64];
+      doc.setTextColor(col[0],col[1],col[2]);
+      lines.forEach((ln, li)=>{
+        const by = y + PAD + 2.45 + li*LINE;
+        if(c.align==='right') doc.text(ln, cx+c.w-2, by, {align:'right'});
+        else doc.text(ln, cx+2.4, by);
+      });
+      cx += c.w;
+    });
+    doc.setDrawColor(226,232,238); doc.setLineWidth(0.15);
+    doc.line(o.x, y+rowH, o.x+o.width, y+rowH);
+    y += rowH;
+  });
+  return y;
+}
+
+// Título de seção + legenda da faixa de gravidade
+function drawPdfSectionTitle(doc, text, x, y, width, color){
+  doc.setFont('helvetica','bold'); doc.setFontSize(9.5);
+  doc.setTextColor(color[0],color[1],color[2]);
+  doc.text(text, x, y);
+  doc.setFont('helvetica','normal'); doc.setFontSize(6.8); doc.setTextColor(120,138,156);
+  const leg = 'Faixa à esquerda:  vermelha = 21+ dias de atraso   ·   rosa = 8 a 20 dias';
+  doc.text(leg, x+width, y, {align:'right'});
+  doc.setFillColor(214,0,52); doc.rect(x+width-doc.getTextWidth(leg)-3.2, y-2.4, 1.1, 2.8, 'F');
+  return y + 4;
+}
+
+function drawPdfKpiBoxes(doc, boxDefs, x, y, width, qtdAtraso){
+  const gap = 6, boxW = (width - gap*(boxDefs.length-1)) / boxDefs.length;
+  boxDefs.forEach((b,idx)=>{
+    const bx = x + idx*(boxW+gap);
+    doc.setDrawColor(225,232,238); doc.setFillColor(243,246,248);
+    doc.roundedRect(bx,y,boxW,17,2,2,'FD');
+    doc.setFont('helvetica','normal'); doc.setFontSize(7.3); doc.setTextColor(87,112,138);
+    doc.text(b[0], bx+4, y+6.5);
+    doc.setFont('helvetica','bold'); doc.setFontSize(11.5);
+    if(b[2]) doc.setTextColor(b[2][0],b[2][1],b[2][2]); else doc.setTextColor(0,56,101);
+    doc.text(b[1], bx+4, y+13.6);
+  });
+  return y + 17;
+}
+
 function buildStorePDF(storeName, storeInvoices, cnpjFmt){
   const { jsPDF } = window.jspdf;
-  const doc = new jsPDF({unit:'mm', format:'a4'});
-  const pageW = 210, pageH = 297, marginX = 14;
-  let y = 0;
-
+  const doc = new jsPDF({unit:'mm', format:'a4', orientation:'landscape'});
+  const pageW = 297, pageH = 210, marginX = 12, width = pageW - marginX*2;
   const headerTitle = 'Relatório de Notas Fiscais';
   const headerSubtitle = 'Gerado em '+formatDateBR(new Date())+' · prazo limite: '+state.prazoLimite+' dias';
+  const newPage = ()=>{ doc.addPage(); return drawPdfHeader(doc, {pageW, marginX, title:headerTitle+' — '+storeName, compact:true}) + 6; };
 
-  y = drawPdfHeader(doc, {pageW, marginX, title:headerTitle, subtitle:headerSubtitle, compact:false}) + 9;
+  let y = drawPdfHeader(doc, {pageW, marginX, title:headerTitle, subtitle:headerSubtitle, compact:false}) + 9;
   doc.setTextColor(11,37,64); doc.setFont('helvetica','bold'); doc.setFontSize(13);
   doc.text(storeName, marginX, y);
-  y += 6;
+  y += 5.5;
   doc.setFont('helvetica','normal'); doc.setFontSize(9.5); doc.setTextColor(87,112,138);
   doc.text('CNPJ: '+(cnpjFmt||'—'), marginX, y);
-  y += 9;
+  y += 7;
 
   const total = storeInvoices.length;
   const atrasadas = storeInvoices.filter(i=>i.emAtraso);
@@ -2212,7 +2323,7 @@ function buildStorePDF(storeName, storeInvoices, cnpjFmt){
 
   if(total===0){
     doc.setDrawColor(225,232,238); doc.setFillColor(243,246,248);
-    doc.roundedRect(marginX,y,pageW-marginX*2,20,3,3,'FD');
+    doc.roundedRect(marginX,y,width,20,3,3,'FD');
     doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(87,112,138);
     doc.text('Nenhuma nota fiscal encontrada para esta loja.', marginX+8, y+12);
     drawPdfFooter(doc, {pageW, pageH, marginX});
@@ -2220,135 +2331,55 @@ function buildStorePDF(storeName, storeInvoices, cnpjFmt){
   }
 
   const media = qtd ? atrasadas.reduce((s,i)=>s+i.diasEmAtraso,0)/qtd : 0;
-  const valorTotal = atrasadas.reduce((s,i)=> s + (i.valor||0), 0);
-  // Só considera notas com data válida (as sem data não têm "dias desde a emissão")
   const comData = storeInvoices.filter(i=>i.diasDesdeEmissao!=null);
   let maisAntiga = null;
   comData.forEach(i=>{ if(!maisAntiga || i.diasDesdeEmissao > maisAntiga.diasDesdeEmissao) maisAntiga = i; });
-
+  const comObs = storeInvoices.filter(i=>getObs(i).trim()).length;
   const boxDefs = [
-    ['Total de Notas', String(total)],
-    ['Notas em Atraso', String(qtd)],
-    ['Média Dias em Atraso', qtd ? fmtDec(media,1) : '—']
+    ['Total de Notas', fmtInt(total)],
+    ['Notas em Atraso', fmtInt(qtd), qtd?[214,0,52]:null],
+    ['Média Dias em Atraso', qtd ? fmtDec(media,1) : '—'],
+    ['Nota Mais Antiga', maisAntiga ? formatDateBR(maisAntiga.dataEmissao)+' ('+maisAntiga.diasDesdeEmissao+'d)' : '—'],
+    ['Com Observação', fmtInt(comObs), [14,139,129]]
   ];
-  if(temValor) boxDefs.push(['Valor em Atraso', fmtMoney(valorTotal)]);
-  else boxDefs.push(['Nota Mais Antiga', maisAntiga ? formatDateBR(maisAntiga.dataEmissao)+' ('+maisAntiga.diasDesdeEmissao+'d)' : '—']);
-
-  const boxW = (pageW - marginX*2 - 6*(boxDefs.length-1)) / boxDefs.length;
-  boxDefs.forEach((b,idx)=>{
-    const x = marginX + idx*(boxW+6);
-    doc.setDrawColor(225,232,238); doc.setFillColor(243,246,248);
-    doc.roundedRect(x,y,boxW,18,2,2,'FD');
-    doc.setFont('helvetica','normal'); doc.setFontSize(7.5); doc.setTextColor(87,112,138);
-    doc.text(b[0], x+4, y+7);
-    doc.setFont('helvetica','bold'); doc.setFontSize(11.5); doc.setTextColor(idx===1&&qtd>0?214:0, idx===1&&qtd>0?0:56, idx===1&&qtd>0?52:101);
-    doc.text(b[1], x+4, y+14.5);
-  });
-  y += 18 + 9;
-
-  const sorted = [...storeInvoices].sort(byMostOverdue);
+  if(temValor) boxDefs.splice(3, 0, ['Valor em Atraso', fmtMoney(atrasadas.reduce((s,i)=>s+(i.valor||0),0))]);
+  y = drawPdfKpiBoxes(doc, boxDefs, marginX, y, width, qtd) + 9;
 
   if(qtd===0){
     doc.setDrawColor(180,230,222); doc.setFillColor(227,251,248);
-    doc.roundedRect(marginX,y,pageW-marginX*2,14,3,3,'FD');
+    doc.roundedRect(marginX,y,width,12,3,3,'FD');
     doc.setFont('helvetica','bold'); doc.setFontSize(10); doc.setTextColor(14,139,129);
-    doc.text('Nenhuma nota em atraso — todas as notas desta loja estão dentro do prazo.', marginX+8, y+9);
-    y += 14 + 9;
-  } else if(sorted.filter(i=>i.emAtraso).length > 3){
-    // --- Destaque: as notas com maior atraso ganham um bloco de atenção antes da tabela ---
+    doc.text('Nenhuma nota em atraso — todas as notas desta loja estão dentro do prazo.', marginX+8, y+7.8);
+    y += 12 + 8;
+  } else if(qtd > 3){
+    // Destaque: as 3 notas com mais dias em atraso
     doc.setFont('helvetica','bold'); doc.setFontSize(9.5); doc.setTextColor(214,0,52);
     doc.text('MAIOR ATENÇÃO — notas com mais dias em atraso', marginX, y);
-    y += 5.5;
+    y += 4.5;
     const destaques = atrasadas.slice().sort((a,b)=>b.diasEmAtraso-a.diasEmAtraso).slice(0,3);
-    const dGap = 6;
-    const dW = (pageW - marginX*2 - dGap*2)/3;
+    const dGap = 6, dW = (width - dGap*2)/3;
     destaques.forEach((inv, idx)=>{
       const x = marginX + idx*(dW+dGap);
-      doc.setDrawColor(214,0,52); doc.setFillColor(253,234,240);
-      doc.roundedRect(x,y,dW,21,2,2,'FD');
-      doc.setFont('helvetica','bold'); doc.setFontSize(7.6); doc.setTextColor(160,0,41);
-      doc.text('NF '+String(inv.numeroNF).slice(0,13), x+4, y+6.5);
-      doc.setFont('helvetica','normal'); doc.setFontSize(7); doc.setTextColor(87,112,138);
-      doc.text(String(inv.nomeRemetente).slice(0,30), x+4, y+11.3, {maxWidth:dW-7});
-      doc.setFont('helvetica','bold'); doc.setFontSize(13.5); doc.setTextColor(214,0,52);
-      doc.text(fmtInt(inv.diasEmAtraso)+'d de atraso', x+4, y+18);
+      doc.setDrawColor(236,124,151); doc.setFillColor(253,234,240);
+      doc.roundedRect(x,y,dW,19,2,2,'FD');
+      doc.setFont('helvetica','bold'); doc.setFontSize(7.8); doc.setTextColor(160,0,41);
+      doc.text('NF '+inv.numeroNF, x+4, y+6);
+      doc.setFont('helvetica','normal'); doc.setFontSize(7.2); doc.setTextColor(87,112,138);
+      doc.text(pdfTruncate(doc, inv.nomeRemetente+' · emitida em '+inv.dataEmissaoFmt, dW-40), x+4, y+11);
+      doc.setFont('helvetica','bold'); doc.setFontSize(14); doc.setTextColor(214,0,52);
+      doc.text(fmtInt(inv.diasEmAtraso)+'d', x+dW-4, y+12, {align:'right'});
+      const obs = getObs(inv).trim();
+      doc.setFont('helvetica', obs?'italic':'normal'); doc.setFontSize(6.9); doc.setTextColor(obs?11:160, obs?37:175, obs?64:190);
+      doc.text(pdfTruncate(doc, obs ? 'Obs.: '+obs : 'Sem observação', dW-8), x+4, y+16);
     });
-    y += 21 + 10;
+    y += 19 + 9;
   }
 
-  const cols = temValor ? [
-    {key:'numeroNF', label:'Nota Fiscal', w:20, max:16},
-    {key:'nomeRemetente', label:'Remetente', w:44, max:26},
-    {key:'dataEmissaoFmt', label:'Emissão', w:18},
-    {key:'diasDesdeEmissao', label:'Dias', w:12},
-    {key:'status', label:'Status', w:22},
-    {key:'diasEmAtraso', label:'Atraso', w:14},
-    {key:'valorFmt', label:'Valor', w:20}
-  ] : [
-    {key:'numeroNF', label:'Nota Fiscal', w:24, max:18},
-    {key:'nomeRemetente', label:'Remetente', w:56, max:34},
-    {key:'dataEmissaoFmt', label:'Emissão', w:20},
-    {key:'diasDesdeEmissao', label:'Dias', w:14},
-    {key:'status', label:'Status', w:24},
-    {key:'diasEmAtraso', label:'Dias Atraso', w:22}
-  ];
-  const tableW = cols.reduce((s,c)=>s+c.w,0);
-  const startX = marginX;
-
-  function drawTableHeader(yy){
-    doc.setFillColor(0,56,101);
-    doc.rect(startX,yy,tableW,7.5,'F');
-    doc.setTextColor(255,255,255); doc.setFont('helvetica','bold'); doc.setFontSize(8);
-    let x = startX;
-    cols.forEach(c=>{ doc.text(c.label, x+2, yy+5.2); x+=c.w; });
-    return yy+7.5;
-  }
-
-  doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(11,37,64);
-  doc.text('Todas as notas desta loja ('+fmtInt(total)+') — mais atrasadas primeiro', marginX, y);
-  y += 5;
-  y = drawTableHeader(y);
-  doc.setFont('helvetica','normal'); doc.setFontSize(8);
-
-  sorted.forEach((inv, idx)=>{
-    const obsLayout = pdfObsLayout(doc, inv, tableW);
-    if(y + 6.5 + (obsLayout ? obsLayout.h : 0) > pageH - 13.5){
-      doc.addPage();
-      y = drawPdfHeader(doc, {pageW, marginX, title:headerTitle, compact:true}) + 5;
-      y = drawTableHeader(y);
-    }
-    const emAtraso = !!inv.emAtraso;
-    const d = inv.diasEmAtraso;
-    let rowFill = idx%2===0 ? [247,249,250] : [255,255,255];
-    let markSeverity = false;
-    if(emAtraso){
-      if(d >= 21){ rowFill = [246,199,210]; markSeverity = true; }
-      else if(d >= 8){ rowFill = [253,234,240]; }
-    }
-    doc.setFillColor(rowFill[0],rowFill[1],rowFill[2]);
-    doc.rect(startX,y,tableW,6.5,'F');
-
-    let x = startX;
-    doc.setTextColor(11,37,64); doc.setFont('helvetica','normal');
-    doc.text((markSeverity?'* ':'')+String(inv.numeroNF).slice(0,cols[0].max), x+2, y+4.6); x+=cols[0].w;
-    doc.text(String(inv.nomeRemetente).slice(0,cols[1].max), x+2, y+4.6); x+=cols[1].w;
-    doc.text(inv.dataEmissaoFmt, x+2, y+4.6); x+=cols[2].w;
-    doc.text(inv.diasDesdeEmissao!=null?String(inv.diasDesdeEmissao):'—', x+2, y+4.6); x+=cols[3].w;
-    if(emAtraso){ doc.setTextColor(214,0,52); doc.setFont('helvetica','bold'); doc.text('Em Atraso', x+2, y+4.6); }
-    else if(!inv.dataEmissao){ doc.setTextColor(140,160,179); doc.setFont('helvetica','bold'); doc.text('Sem data', x+2, y+4.6); }
-    else { doc.setTextColor(14,139,129); doc.setFont('helvetica','bold'); doc.text('No Prazo', x+2, y+4.6); }
-    doc.setFont('helvetica','normal'); x+=cols[4].w;
-    doc.setTextColor(214,0,52); doc.setFont('helvetica','bold');
-    doc.setFontSize(markSeverity?8.6:8);
-    doc.text(emAtraso? String(inv.diasEmAtraso) : '—', x+2, y+4.6); x+=cols[5].w;
-    doc.setFontSize(8);
-    if(temValor){
-      doc.setTextColor(11,37,64); doc.setFont('helvetica','normal');
-      doc.text(inv.valor!=null? fmtMoney(inv.valor).replace('R$','').trim() : '—', x+2, y+4.6);
-    }
-    y += 6.5;
-    if(obsLayout) y += drawPdfObs(doc, obsLayout, startX, y, tableW, rowFill);
-  });
+  const sorted = [...storeInvoices].sort(byMostOverdue);
+  y = drawPdfSectionTitle(doc, 'Todas as notas desta loja ('+fmtInt(total)+') — mais atrasadas primeiro', marginX, y, width, [11,37,64]);
+  const C = PDF_COLS;
+  const cols = [C.nota, C.remetente, C.emissao, C.dias, C.status, C.atraso].concat(temValor?[C.valor]:[]).concat([C.obs]);
+  drawPdfNotesTable(doc, {x:marginX, y, width, cols, rows:sorted, pageH, headerFill:[0,56,101], onNewPage:newPage});
 
   drawPdfFooter(doc, {pageW, pageH, marginX});
   return doc;
@@ -2605,17 +2636,17 @@ function describeNotasFilters(){
 
 function buildNotasReportPDF(){
   const { jsPDF } = window.jspdf;
-  const doc = new jsPDF({unit:'mm', format:'a4'});
-  const pageW = 210, pageH = 297, marginX = 14;
+  const doc = new jsPDF({unit:'mm', format:'a4', orientation:'landscape'});
+  const pageW = 297, pageH = 210, marginX = 12, width = pageW - marginX*2;
   const headerTitle = 'Relatório de Notas Fiscais — Mais Antigas';
   const headerSubtitle = 'Gerado em '+formatDateBR(new Date())+' · prazo limite: '+state.prazoLimite+' dias';
+  const newPage = ()=>{ doc.addPage(); return drawPdfHeader(doc, {pageW, marginX, title:headerTitle, compact:true}) + 6; };
 
-  let y = drawPdfHeader(doc, {pageW, marginX, title:headerTitle, subtitle:headerSubtitle, compact:false}) + 9;
+  let y = drawPdfHeader(doc, {pageW, marginX, title:headerTitle, subtitle:headerSubtitle, compact:false}) + 8;
 
   doc.setFont('helvetica','italic'); doc.setFontSize(8.5); doc.setTextColor(87,112,138);
-  doc.text(describeNotasFilters(), marginX, y, {maxWidth:pageW-marginX*2});
-  doc.setFont('helvetica','normal');
-  y += 9;
+  doc.text(describeNotasFilters(), marginX, y, {maxWidth:width});
+  y += 6;
 
   const filtered = getFilteredNotas();
   const sorted = [...filtered].sort(byMostOverdue);
@@ -2624,164 +2655,43 @@ function buildNotasReportPDF(){
   const qtd = atrasadas.length;
   const media = qtd ? atrasadas.reduce((s,i)=>s+i.diasEmAtraso,0)/qtd : 0;
   const temValor = sorted.some(i=>i.valor!=null);
-  const valorTotal = atrasadas.reduce((s,i)=>s+(i.valor||0),0);
-  const lojasEnvolvidas = new Set(sorted.map(i=>i.nomeDestinatario)).size;
+  const comObs = sorted.filter(i=>getObs(i).trim()).length;
 
   const boxDefs = [
     ['Notas no Filtro', fmtInt(total)],
-    ['Em Atraso', fmtInt(qtd)],
-    ['Média Dias em Atraso', qtd? fmtDec(media,1) : '—'],
-    temValor ? ['Valor em Atraso', fmtMoney(valorTotal)] : ['Lojas Envolvidas', fmtInt(lojasEnvolvidas)]
+    ['Em Atraso', fmtInt(qtd), qtd?[214,0,52]:null],
+    ['Média Dias em Atraso', qtd ? fmtDec(media,1) : '—'],
+    temValor ? ['Valor em Atraso', fmtMoney(atrasadas.reduce((s,i)=>s+(i.valor||0),0))]
+             : ['Lojas Envolvidas', fmtInt(new Set(sorted.map(i=>i.nomeDestinatario)).size)],
+    ['Com Observação', fmtInt(comObs), [14,139,129]]
   ];
-  const boxW = (pageW - marginX*2 - 6*(boxDefs.length-1))/boxDefs.length;
-  boxDefs.forEach((b,idx)=>{
-    const x = marginX + idx*(boxW+6);
-    doc.setDrawColor(225,232,238); doc.setFillColor(243,246,248);
-    doc.roundedRect(x,y,boxW,18,2,2,'FD');
-    doc.setFont('helvetica','normal'); doc.setFontSize(7.5); doc.setTextColor(87,112,138);
-    doc.text(b[0], x+4, y+7);
-    doc.setFont('helvetica','bold'); doc.setFontSize(11.5);
-    doc.setTextColor(idx===1&&qtd>0?214:0, idx===1&&qtd>0?0:56, idx===1&&qtd>0?52:101);
-    doc.text(b[1], x+4, y+14.5);
-  });
-  y += 18+9;
+  y = drawPdfKpiBoxes(doc, boxDefs, marginX, y, width, qtd) + 9;
 
   if(total===0){
     doc.setDrawColor(225,232,238); doc.setFillColor(243,246,248);
-    doc.roundedRect(marginX,y,pageW-marginX*2,20,3,3,'FD');
+    doc.roundedRect(marginX,y,width,20,3,3,'FD');
     doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(87,112,138);
     doc.text('Nenhuma nota encontrada com os filtros selecionados.', marginX+8, y+12);
     drawPdfFooter(doc, {pageW, pageH, marginX});
     return doc;
   }
 
-  // --- Destaque: as N notas mais antigas em atraso de toda a base filtrada ---
+  const C = PDF_COLS;
+
+  // --- Destaque: as 10 notas mais antigas em atraso ---
   if(qtd > 0){
     const topN = atrasadas.slice(0, Math.min(10, qtd));
-    if(y > pageH - 70){ doc.addPage(); y = drawPdfHeader(doc,{pageW,marginX,title:headerTitle,compact:true})+8; }
-    doc.setFont('helvetica','bold'); doc.setFontSize(9.5); doc.setTextColor(214,0,52);
-    doc.text('MAIOR ATENÇÃO — as '+topN.length+' notas mais antigas em atraso', marginX, y);
-    y += 5.5;
-    const hCols = [
-      {key:'numeroNF', label:'Nota', w:22, max:16},
-      {key:'nomeDestinatario', label:'Loja', w:46, max:28},
-      {key:'nomeRemetente', label:'Remetente', w:46, max:28},
-      {key:'dataEmissaoFmt', label:'Emissão', w:20},
-      {key:'diasEmAtraso', label:'Dias em Atraso', w:28}
-    ];
-    const hTableW = hCols.reduce((s,c)=>s+c.w,0);
-    function drawHighlightHeader(yy){
-      doc.setFillColor(214,0,52);
-      doc.rect(marginX,yy,hTableW,7,'F');
-      doc.setTextColor(255,255,255); doc.setFont('helvetica','bold'); doc.setFontSize(7.6);
-      let hx = marginX;
-      hCols.forEach(c=>{ doc.text(c.label, hx+2, yy+4.8); hx+=c.w; });
-      doc.setFont('helvetica','normal'); doc.setFontSize(8);
-      return yy+7;
-    }
-    y = drawHighlightHeader(y);
-    topN.forEach((inv, idx)=>{
-      const obsLayout = pdfObsLayout(doc, inv, hTableW);
-      if(y + 6.6 + (obsLayout ? obsLayout.h : 0) > pageH - 13.5){
-        doc.addPage();
-        y = drawPdfHeader(doc,{pageW,marginX,title:headerTitle,compact:true}) + 5;
-        y = drawHighlightHeader(y);
-      }
-      const hFill = idx===0 ? [246,199,210] : [253,234,240];
-      doc.setFillColor(hFill[0],hFill[1],hFill[2]);
-      doc.rect(marginX,y,hTableW,6.6,'F');
-      let hx2 = marginX;
-      doc.setTextColor(11,37,64); doc.setFont('helvetica','normal');
-      doc.text((idx===0?'* ':'')+String(inv.numeroNF).slice(0,16), hx2+2, y+4.6); hx2+=hCols[0].w;
-      doc.text(String(inv.nomeDestinatario).slice(0,28), hx2+2, y+4.6); hx2+=hCols[1].w;
-      doc.text(String(inv.nomeRemetente).slice(0,28), hx2+2, y+4.6); hx2+=hCols[2].w;
-      doc.text(inv.dataEmissaoFmt, hx2+2, y+4.6); hx2+=hCols[3].w;
-      doc.setTextColor(214,0,52); doc.setFont('helvetica','bold'); doc.setFontSize(9.5);
-      doc.text(fmtInt(inv.diasEmAtraso)+'d', hx2+2, y+4.7);
-      doc.setFont('helvetica','normal'); doc.setFontSize(8);
-      y += 6.6;
-      if(obsLayout) y += drawPdfObs(doc, obsLayout, marginX, y, hTableW, hFill);
-    });
-    y += 9;
+    if(y > pageH - 50) y = newPage();
+    y = drawPdfSectionTitle(doc, 'MAIOR ATENÇÃO — as '+topN.length+' notas mais antigas em atraso', marginX, y, width, [214,0,52]);
+    y = drawPdfNotesTable(doc, {x:marginX, y, width, rows:topN, pageH, headerFill:[214,0,52], onNewPage:newPage,
+      cols:[C.nota, C.loja, C.remetente, C.emissao, C.atraso, C.obs]}) + 10;
   }
 
-  // --- Tabela completa (respeita os filtros aplicados) ---
-  const cols = temValor ? [
-    {key:'numeroNF', label:'Nota Fiscal', w:18, max:13},
-    {key:'nomeRemetente', label:'Remetente', w:33, max:19},
-    {key:'nomeDestinatario', label:'Loja', w:33, max:19},
-    {key:'dataEmissaoFmt', label:'Emissão', w:17},
-    {key:'diasDesdeEmissao', label:'Dias', w:11},
-    {key:'status', label:'Status', w:19},
-    {key:'diasEmAtraso', label:'Atraso', w:13},
-    {key:'valorFmt', label:'Valor', w:16}
-  ] : [
-    {key:'numeroNF', label:'Nota Fiscal', w:20, max:15},
-    {key:'nomeRemetente', label:'Remetente', w:39, max:23},
-    {key:'nomeDestinatario', label:'Loja', w:39, max:23},
-    {key:'dataEmissaoFmt', label:'Emissão', w:19},
-    {key:'diasDesdeEmissao', label:'Dias', w:13},
-    {key:'status', label:'Status', w:22},
-    {key:'diasEmAtraso', label:'Dias em Atraso', w:20}
-  ];
-  const tableW = cols.reduce((s,c)=>s+c.w,0);
-  const startX = marginX;
-
-  function drawTableHeader(yy){
-    doc.setFillColor(0,56,101);
-    doc.rect(startX,yy,tableW,7.5,'F');
-    doc.setTextColor(255,255,255); doc.setFont('helvetica','bold'); doc.setFontSize(7.6);
-    let x = startX;
-    cols.forEach(c=>{ doc.text(c.label, x+2, yy+5.2); x+=c.w; });
-    return yy+7.5;
-  }
-
-  if(y > pageH - 40){ doc.addPage(); y = drawPdfHeader(doc,{pageW,marginX,title:headerTitle,compact:true})+8; }
-  doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(11,37,64);
-  doc.text('Todas as notas do filtro ('+fmtInt(total)+') — mais antigas primeiro', marginX, y);
-  y += 5;
-  y = drawTableHeader(y);
-  doc.setFont('helvetica','normal'); doc.setFontSize(7.8);
-
-  sorted.forEach((inv, idx)=>{
-    const obsLayout = pdfObsLayout(doc, inv, tableW);
-    if(y + 6.3 + (obsLayout ? obsLayout.h : 0) > pageH - 13.7){
-      doc.addPage();
-      y = drawPdfHeader(doc, {pageW, marginX, title:headerTitle, compact:true}) + 5;
-      y = drawTableHeader(y);
-    }
-    const emAtraso = !!inv.emAtraso;
-    const d = inv.diasEmAtraso;
-    let rowFill = idx%2===0 ? [247,249,250] : [255,255,255];
-    let markSeverity = false;
-    if(emAtraso){
-      if(d>=21){ rowFill=[246,199,210]; markSeverity=true; }
-      else if(d>=8){ rowFill=[253,234,240]; }
-    }
-    doc.setFillColor(rowFill[0],rowFill[1],rowFill[2]);
-    doc.rect(startX,y,tableW,6.3,'F');
-    let x = startX;
-    doc.setTextColor(11,37,64); doc.setFont('helvetica','normal');
-    doc.text((markSeverity?'* ':'')+String(inv.numeroNF).slice(0,cols[0].max), x+2, y+4.4); x+=cols[0].w;
-    doc.text(String(inv.nomeRemetente).slice(0,cols[1].max), x+2, y+4.4); x+=cols[1].w;
-    doc.text(String(inv.nomeDestinatario).slice(0,cols[2].max), x+2, y+4.4); x+=cols[2].w;
-    doc.text(inv.dataEmissaoFmt, x+2, y+4.4); x+=cols[3].w;
-    doc.text(inv.diasDesdeEmissao!=null?String(inv.diasDesdeEmissao):'—', x+2, y+4.4); x+=cols[4].w;
-    if(emAtraso){ doc.setTextColor(214,0,52); doc.setFont('helvetica','bold'); doc.text('Em Atraso', x+2, y+4.4); }
-    else if(!inv.dataEmissao){ doc.setTextColor(140,160,179); doc.setFont('helvetica','bold'); doc.text('Sem data', x+2, y+4.4); }
-    else { doc.setTextColor(14,139,129); doc.setFont('helvetica','bold'); doc.text('No Prazo', x+2, y+4.4); }
-    doc.setFont('helvetica','normal'); x+=cols[5].w;
-    doc.setTextColor(214,0,52); doc.setFont('helvetica','bold');
-    doc.setFontSize(markSeverity?8.4:7.8);
-    doc.text(emAtraso?String(inv.diasEmAtraso):'—', x+2, y+4.4); x+=cols[6].w;
-    doc.setFontSize(7.8);
-    if(temValor){
-      doc.setTextColor(11,37,64); doc.setFont('helvetica','normal');
-      doc.text(inv.valor!=null? fmtMoney(inv.valor).replace('R$','').trim() : '—', x+2, y+4.4);
-    }
-    y += 6.3;
-    if(obsLayout) y += drawPdfObs(doc, obsLayout, startX, y, tableW, rowFill);
-  });
+  // --- Lista completa (respeita os filtros aplicados na aba Notas Fiscais) ---
+  if(y > pageH - 45) y = newPage();
+  y = drawPdfSectionTitle(doc, 'Todas as notas do filtro ('+fmtInt(total)+') — mais antigas primeiro', marginX, y, width, [11,37,64]);
+  const cols = [C.nota, C.remetente, C.loja, C.emissao, C.dias, C.status, C.atraso].concat(temValor?[C.valor]:[]).concat([C.obs]);
+  drawPdfNotesTable(doc, {x:marginX, y, width, cols, rows:sorted, pageH, headerFill:[0,56,101], onNewPage:newPage});
 
   drawPdfFooter(doc, {pageW, pageH, marginX});
   return doc;
