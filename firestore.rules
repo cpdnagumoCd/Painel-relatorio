@@ -3,37 +3,69 @@ rules_version = '2';
 // Regras do Firestore para o Painel de Notas Fiscais.
 // Publique em: Console do Firebase > Firestore Database > Regras.
 //
-// - Leitura aberta: qualquer pessoa com o link do site vê o painel.
-// - Gravação só com login (Firebase Authentication, e-mail e senha).
-//   IMPORTANTE: desative o cadastro público em Authentication > Configurações >
-//   Ações do usuário > "Ativar criação (inscrição)". Assim só as contas criadas
-//   por você no console conseguem enviar a planilha e escrever observações.
+// - Leitura do painel aberta: qualquer pessoa com o link vê os dados.
+// - Gravação só para quem está na lista "usuarios" (cadastrados pela aba
+//   Usuários do site). Ter uma conta no Firebase Authentication NÃO basta:
+//   por isso o cadastro público pode ficar ativado sem risco.
+// - Administradores (usuarios/{email}.admin == true) gerenciam a lista.
+// - O primeiro administrador se cadastra uma única vez pelo botão
+//   "Tornar-me administrador" (cria config/setup, que trava essa opção).
 service cloud.firestore {
   match /databases/{database}/documents {
 
     function logado() {
-      return request.auth != null;
+      return request.auth != null && request.auth.token.email is string;
+    }
+    function meuEmail() {
+      return request.auth.token.email.lower();
+    }
+    function editor() {
+      return logado() && exists(/databases/$(database)/documents/usuarios/$(meuEmail()));
+    }
+    function admin() {
+      return editor() && get(/databases/$(database)/documents/usuarios/$(meuEmail())).data.admin == true;
     }
 
     // Dados da última publicação (versão, data, autor, contagens)
     match /base/{id} {
       allow read: if true;
-      allow write: if logado();
+      allow write: if editor();
     }
 
     // Base acumulada de notas, dividida em blocos
     match /base_chunks/{id} {
       allow read: if true;
-      allow write: if logado();
+      allow write: if editor();
     }
 
     // Uma observação por nota
     match /observacoes/{id} {
       allow read: if true;
-      allow create, update: if logado()
+      allow create, update: if editor()
         && request.resource.data.texto is string
         && request.resource.data.texto.size() <= 500;
-      allow delete: if logado();
+      allow delete: if editor();
+    }
+
+    // Lista de quem pode editar (documento = e-mail em minúsculas)
+    match /usuarios/{email} {
+      allow get: if logado() && (email == meuEmail() || admin());
+      allow list: if admin();
+      // administrador cadastra, altera e remove os outros (não a si mesmo)
+      allow create, update, delete: if admin() && email != meuEmail();
+      // primeiro administrador: só enquanto config/setup não existir
+      allow create: if logado() && email == meuEmail()
+        && request.resource.data.admin == true
+        && !exists(/databases/$(database)/documents/config/setup)
+        && existsAfter(/databases/$(database)/documents/config/setup);
+    }
+
+    // Marca que o primeiro administrador já foi definido
+    match /config/setup {
+      allow read: if true;
+      allow create: if logado()
+        && !exists(/databases/$(database)/documents/config/setup)
+        && existsAfter(/databases/$(database)/documents/usuarios/$(meuEmail()));
     }
   }
 }

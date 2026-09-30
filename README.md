@@ -39,9 +39,19 @@ Projeto: `relatorio-entre-o-grupo`.
 
 1. **Firestore Database › Regras:** cole o conteúdo de [`firestore.rules`](firestore.rules) e clique em **Publicar**.
 2. **Authentication › Método de login:** ative **E-mail/senha**.
-3. **Authentication › Usuários › Adicionar usuário:** crie uma conta para cada pessoa que vai enviar a planilha ou escrever observações.
-4. **Authentication › Configurações › Ações do usuário:** desmarque **Ativar criação (inscrição)**. Assim ninguém cria conta sozinho.
-5. **Authentication › Configurações › Domínios autorizados:** adicione o domínio do GitHub Pages (`SEU-USUARIO.github.io`).
+3. **Authentication › Configurações › Domínios autorizados:** adicione `cpdnagumocd.github.io`.
+4. Entre no site com uma conta criada no console e, na aba **Usuários**, clique em **Tornar-me administrador**. Isso só funciona uma vez.
+5. **Authentication › Configurações › Ações do usuário:** deixe **Ativar criação (inscrição)** ligado. O site precisa disso para criar contas pela aba Usuários.
+   Não é uma brecha: as regras só deixam editar quem está na lista de usuários do painel.
+
+## Usuários
+
+Na aba **Usuários** (visível só para administradores):
+
+- **Adicionar usuário:** cria a conta e libera a edição. Você pode definir uma senha inicial ou enviar um e-mail para a pessoa criar a própria senha.
+- **Enviar link de senha:** para quem esqueceu a senha.
+- **Tornar admin / Tirar admin:** administradores também cadastram e removem usuários.
+- **Remover acesso:** tira a permissão de edição na hora. Para apagar a conta de vez: console › Authentication › Usuários.
 
 ## Publicação no GitHub Pages
 

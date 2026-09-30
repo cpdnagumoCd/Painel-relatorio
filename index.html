@@ -443,6 +443,17 @@ details.mapping-details summary{font-size:13px;font-weight:700;color:var(--navy)
 .modal-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:4px;}
 .form-error{font-size:12.5px;color:var(--red-dark);font-weight:700;min-height:0;}
 .form-error:empty{display:none;}
+.users-grid{display:grid;grid-template-columns:minmax(0,380px) minmax(0,1fr);gap:20px;align-items:start;}
+.user-form{display:flex;flex-direction:column;gap:14px;}
+#users-table{min-width:600px;}
+.user-cell b{display:block;color:var(--navy-deep);}
+.user-cell > span{font-size:12px;color:var(--ink-soft);}
+.user-cell .badge{margin-left:6px;vertical-align:middle;}
+.row-actions{display:flex;gap:6px;flex-wrap:wrap;}
+.btn-mini--ghost{background:var(--bg);color:var(--navy);border:1px solid var(--line);}
+.btn-mini--ghost:hover{background:var(--navy-tint);}
+.btn-mini--danger{background:var(--red-tint);color:var(--red-dark);}
+.btn-mini--danger:hover{background:#F9D2DD;}
 .obs-input[readonly]{background:var(--bg);cursor:default;}
 .obs-input[readonly]:focus{box-shadow:none;border-color:var(--line);}
 
@@ -452,7 +463,7 @@ details.mapping-details summary{font-size:13px;font-weight:700;color:var(--navy)
   .toolbar .field--search{grid-column:1 / -1;}
 }
 @media (max-width:1150px){
-  .dash-row-a,.dash-row-b,.grid-2,.upload-grid,.report-grid{grid-template-columns:minmax(0,1fr);}
+  .dash-row-a,.dash-row-b,.grid-2,.upload-grid,.report-grid,.users-grid{grid-template-columns:minmax(0,1fr);}
   .publish-stats{grid-template-columns:repeat(2,minmax(0,1fr));}
 }
 @media (max-width:900px){
@@ -526,6 +537,10 @@ details.mapping-details summary{font-size:13px;font-weight:700;color:var(--navy)
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M7 3h7l4 4v14H7z" stroke-linejoin="round"/><path d="M14 3v4h4" stroke-linejoin="round"/><path d="M12.5 11v6m0 0-2.3-2.3m2.3 2.3 2.3-2.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
         Relatórios em PDF
       </button>
+      <button class="nav-item" data-tab="usuarios" type="button" id="nav-usuarios" hidden>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0" stroke-linecap="round"/><path d="M16 4.8a3.5 3.5 0 0 1 0 6.4M18.5 14.5a6.5 6.5 0 0 1 3 5.5" stroke-linecap="round"/></svg>
+        Usuários
+      </button>
     </nav>
 
     <div class="sidebar-foot">
@@ -542,6 +557,7 @@ details.mapping-details summary{font-size:13px;font-weight:700;color:var(--navy)
         </div>
         <div id="auth-in" hidden>
           <div class="status-line"><span class="status-dot on"></span><span id="auth-email"></span></div>
+          <div class="status-sub" id="auth-role"></div>
           <button class="side-btn side-btn--ghost" id="logout-btn" type="button">Sair</button>
         </div>
       </div>
@@ -578,9 +594,9 @@ details.mapping-details summary{font-size:13px;font-weight:700;color:var(--navy)
           <div class="upload-lock" id="upload-lock" hidden>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="5" y="10.5" width="14" height="10" rx="2"/><path d="M8 10.5V7.5a4 4 0 0 1 8 0v3" stroke-linecap="round"/></svg>
             <div>
-              <div class="dropzone-title">Entre para enviar a planilha</div>
-              <p class="dropzone-text">A base é compartilhada com todos. Só quem tem conta cadastrada pode publicar a atualização do dia.</p>
-              <button class="btn btn-primary" data-action="login" type="button" style="margin-top:14px;">Entrar</button>
+              <div class="dropzone-title" id="upload-lock-title">Entre para enviar a planilha</div>
+              <p class="dropzone-text">A base é compartilhada com todos. Só usuários cadastrados por um administrador podem publicar a atualização do dia.</p>
+              <button class="btn btn-primary" id="upload-lock-login" data-action="login" type="button" style="margin-top:14px;">Entrar</button>
             </div>
           </div>
           <label class="dropzone" id="dropzone" for="file-input" tabindex="0" hidden>
@@ -1001,6 +1017,77 @@ details.mapping-details summary{font-size:13px;font-weight:700;color:var(--navy)
       </div>
     </section>
 
+    <!-- ============ ABA: USUÁRIOS (só administradores) ============ -->
+    <section class="tab-panel stack" id="view-usuarios" hidden>
+      <header class="page-head">
+        <div>
+          <span class="page-eyebrow">Administração</span>
+          <h1 class="page-title">Usuários</h1>
+          <p class="page-desc">Quem pode enviar a planilha e escrever observações. A visualização do painel continua aberta para qualquer pessoa com o link.</p>
+        </div>
+      </header>
+
+      <div class="card" id="setup-card" hidden>
+        <div class="report-card-head">
+          <span class="report-icon report-icon--teal"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3 4.5 6v5.5c0 4.5 3.2 8.2 7.5 9.5 4.3-1.3 7.5-5 7.5-9.5V6z" stroke-linejoin="round"/><path d="m8.8 12.2 2.3 2.3 4.3-4.6" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+          <div>
+            <h3 class="card-title">Configuração inicial</h3>
+            <p class="card-subtitle">Ainda não existe nenhum administrador. O primeiro a clicar abaixo vira administrador e passa a cadastrar os demais usuários. Isso só pode ser feito uma vez.</p>
+            <button class="btn btn-primary" id="setup-claim" type="button" style="margin-top:14px;">Tornar-me administrador</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="users-grid" id="users-admin" hidden>
+        <div class="card">
+          <form id="user-form" class="user-form" novalidate>
+            <div>
+              <h3 class="card-title">Adicionar usuário</h3>
+              <p class="card-subtitle">Cria a conta e libera o acesso de edição.</p>
+            </div>
+            <div class="field">
+              <label class="field-label" for="user-nome">Nome</label>
+              <input class="input" id="user-nome" autocomplete="off" required>
+            </div>
+            <div class="field">
+              <label class="field-label" for="user-email">E-mail</label>
+              <input class="input" id="user-email" type="email" autocomplete="off" required>
+            </div>
+            <div class="field">
+              <label class="field-label" for="user-pass">Senha inicial</label>
+              <input class="input" id="user-pass" type="text" autocomplete="new-password" minlength="6" placeholder="Opcional se enviar o e-mail abaixo">
+            </div>
+            <label class="checkbox-row" for="user-send-reset">
+              <input type="checkbox" id="user-send-reset" checked>
+              <span>Enviar e-mail para a pessoa criar a própria senha</span>
+            </label>
+            <label class="checkbox-row" for="user-admin">
+              <input type="checkbox" id="user-admin">
+              <span>Administrador (também pode cadastrar e remover usuários)</span>
+            </label>
+            <p class="form-error" id="user-error" role="alert"></p>
+            <div><button class="btn btn-primary" id="user-submit" type="submit">Adicionar usuário</button></div>
+          </form>
+        </div>
+
+        <div class="card">
+          <div class="card-head">
+            <div>
+              <h3 class="card-title">Usuários com acesso</h3>
+              <p class="card-subtitle" id="users-count">0 usuário(s)</p>
+            </div>
+          </div>
+          <div class="table-scroll table-scroll--lojas">
+            <table class="data-table" id="users-table">
+              <thead><tr><th>Usuário</th><th>Perfil</th><th>Adicionado por</th><th>Ações</th></tr></thead>
+              <tbody id="users-tbody"></tbody>
+            </table>
+          </div>
+          <p class="card-subtitle" style="margin-top:10px;">"Remover acesso" tira a permissão de edição na hora. A conta continua existindo no Firebase (Authentication › Usuários), mas não consegue alterar nada.</p>
+        </div>
+      </div>
+    </section>
+
     <footer class="app-footer">
       <span>Painel de Notas Fiscais · Nagumo</span>
       <span id="footer-timestamp"></span>
@@ -1293,7 +1380,10 @@ const state = {
   allInvoices: [],    // base completa (pendentes + resolvidas)
   invoices: [],       // somente as pendentes — é o que alimenta dashboard, rankings e PDFs
   mode: 'connecting', // 'connecting' | 'cloud' (Firebase) | 'local' (sem conexão: só neste navegador)
-  user: null,         // usuário logado no Firebase (quem pode enviar planilha e escrever observações)
+  user: null,         // usuário logado no Firebase
+  role: { editor:false, admin:false }, // editor = está na lista de usuários (pode publicar e escrever observações)
+  setupDone: null,    // já existe um administrador? (false = mostra o botão "Tornar-me administrador")
+  users: [],          // lista de usuários (só carregada para administradores)
   cloudMeta: null,    // informações da última publicação (data, autor, arquivo, contagens)
   pendingPublish: null,
   companyAgg: [],
@@ -1357,7 +1447,7 @@ function flushAllObs(){
   if(state.mode === 'cloud'){ [...obsRemoteTimers.keys()].forEach(k=>{ clearTimeout(obsRemoteTimers.get(k)); flushObs(k); }); }
   else { clearTimeout(setObs._timer); saveObservacoes(); }
 }
-function canEditObs(){ return state.mode !== 'cloud' || !!state.user; }
+function canEditObs(){ return state.mode !== 'cloud' || state.role.editor; }
 
 /* ==========================================================================
    4. PROCESSAMENTO DA PLANILHA
@@ -2903,12 +2993,22 @@ function updateDataStatus(){
 // Liga/desliga partes da interface conforme o modo (nuvem/local) e o login
 function applyModeUI(){
   const cloud = state.mode === 'cloud';
-  const locked = cloud && !state.user;
+  const locked = cloud && !state.role.editor;
   document.getElementById('auth-card').hidden = !cloud;
   document.getElementById('auth-out').hidden = !!state.user;
   document.getElementById('auth-in').hidden = !state.user;
   document.getElementById('auth-email').textContent = state.user ? state.user.email : '';
+  document.getElementById('auth-role').textContent = !state.user ? '' :
+    state.role.admin ? 'Administrador' : state.role.editor ? 'Editor' : 'Sem permissão de edição. Peça acesso a um administrador.';
+  // Aba Usuários: administradores, ou qualquer logado enquanto ainda não existe administrador
+  const showUsers = cloud && !!state.user && (state.role.admin || state.setupDone === false);
+  document.getElementById('nav-usuarios').hidden = !showUsers;
+  if(!showUsers && state.activeTab === 'usuarios') showTab('dashboard');
+  document.getElementById('setup-card').hidden = !(showUsers && state.setupDone === false && !state.role.admin);
+  document.getElementById('users-admin').hidden = !state.role.admin;
   document.getElementById('upload-lock').hidden = !locked;
+  document.getElementById('upload-lock-title').textContent = state.user ? 'Sua conta não pode enviar a planilha' : 'Entre para enviar a planilha';
+  document.getElementById('upload-lock-login').hidden = !!state.user;
   document.getElementById('dropzone').hidden = locked || state.mode === 'connecting';
   document.getElementById('sample-link-row').hidden = state.mode !== 'local';
   document.getElementById('upload-mode-note').textContent = cloud
@@ -2963,8 +3063,8 @@ async function handleFile(file){
     setUploadStatus('error', 'Formato não suportado ("'+file.name+'"). Envie um arquivo .xlsx, .xls, .xlsm ou .csv.');
     return;
   }
-  if(state.mode === 'cloud' && !state.user){
-    setUploadStatus('error', 'Entre com sua conta para enviar a planilha.');
+  if(state.mode === 'cloud' && !state.role.editor){
+    setUploadStatus('error', state.user ? 'Sua conta não tem permissão para enviar a planilha. Peça acesso a um administrador.' : 'Entre com sua conta para enviar a planilha.');
     return;
   }
   cancelPublish();
@@ -3093,8 +3193,126 @@ function cloudOnObs(remote){
 }
 function cloudOnAuth(user){
   state.user = user;
+  if(!user){ state.role = { editor:false, admin:false }; state.users = []; }
   applyModeUI();
+}
+// Permissão do usuário logado (documento usuarios/{email}); muda ao vivo se um admin alterar
+function cloudOnRole(role){
+  state.role = role;
+  applyModeUI();
+  if(role.admin) renderUsers();
   migrateLocalObs();
+}
+function cloudOnSetup(done){ state.setupDone = done; applyModeUI(); }
+function cloudOnUsers(list){ state.users = list; renderUsers(); }
+
+/* ---------- Aba Usuários (administração de acessos) ---------- */
+function renderUsers(){
+  const tbody = document.getElementById('users-tbody');
+  if(!tbody) return;
+  const me = state.user ? state.user.email.toLowerCase() : '';
+  const list = [...state.users].sort((a,b)=> (b.admin-a.admin) || String(a.nome||a.email).localeCompare(String(b.nome||b.email),'pt-BR'));
+  document.getElementById('users-count').textContent = fmtInt(list.length)+' usuário(s) com acesso de edição';
+  tbody.innerHTML = list.map(u=>{
+    const isMe = u.email === me;
+    return '<tr>'+
+      '<td class="user-cell"><b>'+escapeHtml(u.nome||u.email)+(isMe?' <span class="badge badge-gray">você</span>':'')+'</b><span>'+escapeHtml(u.email)+'</span></td>'+
+      '<td>'+(u.admin?'<span class="badge badge-navy">Administrador</span>':'<span class="badge badge-teal">Editor</span>')+'</td>'+
+      '<td class="mono">'+escapeHtml(u.criadoPor||'—')+(u.criadoEm?'<br><small>'+fmtDateTimeBR(u.criadoEm)+'</small>':'')+'</td>'+
+      '<td><div class="row-actions">'+
+        '<button class="btn-mini btn-mini--ghost" type="button" data-user-action="reset" data-email="'+escapeHtml(u.email)+'">Enviar link de senha</button>'+
+        (isMe ? '' :
+          '<button class="btn-mini btn-mini--ghost" type="button" data-user-action="toggle-admin" data-email="'+escapeHtml(u.email)+'">'+(u.admin?'Tirar admin':'Tornar admin')+'</button>'+
+          '<button class="btn-mini btn-mini--danger" type="button" data-user-action="remove" data-email="'+escapeHtml(u.email)+'">Remover acesso</button>')+
+      '</div></td>'+
+    '</tr>';
+  }).join('') || '<tr><td colspan="4" class="empty-note">Nenhum usuário cadastrado.</td></tr>';
+}
+
+function userErrorMsg(err){
+  const c = (err && err.code) || '';
+  if(c.includes('invalid-email')) return 'E-mail inválido.';
+  if(c.includes('weak-password')) return 'A senha precisa ter pelo menos 6 caracteres.';
+  if(c.includes('admin-restricted-operation') || c.includes('operation-not-allowed'))
+    return 'O Firebase está bloqueando a criação de contas. No console, ative Authentication › Configurações › Ações do usuário › "Ativar criação (inscrição)".';
+  if(c.includes('permission-denied')) return 'Sem permissão. Confira se as regras novas (firestore.rules) foram publicadas no Firebase.';
+  if(c.includes('network')) return 'Sem conexão com a internet.';
+  return (err && err.message) ? err.message : 'Erro desconhecido.';
+}
+
+function randomPassword(){
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789';
+  const a = new Uint32Array(14); crypto.getRandomValues(a);
+  return Array.from(a, n=>chars[n % chars.length]).join('');
+}
+
+async function submitNewUser(e){
+  e.preventDefault();
+  const nome = document.getElementById('user-nome').value.trim();
+  const email = document.getElementById('user-email').value.trim().toLowerCase();
+  let senha = document.getElementById('user-pass').value;
+  const admin = document.getElementById('user-admin').checked;
+  const enviarLink = document.getElementById('user-send-reset').checked;
+  const errEl = document.getElementById('user-error');
+  errEl.textContent = '';
+  if(!nome || !email){ errEl.textContent = 'Preencha o nome e o e-mail.'; return; }
+  if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){ errEl.textContent = 'E-mail inválido.'; return; }
+  if(!senha){
+    if(!enviarLink){ errEl.textContent = 'Defina uma senha inicial ou marque "Enviar e-mail para a pessoa criar a própria senha".'; return; }
+    senha = randomPassword();
+  }
+  if(senha.length < 6){ errEl.textContent = 'A senha precisa ter pelo menos 6 caracteres.'; return; }
+  if(state.users.some(u=>u.email===email)){ errEl.textContent = 'Este e-mail já tem acesso.'; return; }
+  const btn = document.getElementById('user-submit');
+  btn.disabled = true; btn.textContent = 'Adicionando...';
+  try{
+    const r = await window.Cloud.createUser({ nome, email, senha, admin });
+    if(enviarLink) await window.Cloud.resetPassword(email);
+    document.getElementById('user-form').reset();
+    document.getElementById('user-send-reset').checked = true;
+    showToast(r.existia
+      ? 'Acesso liberado para '+email+' (a conta já existia; a senha dela não mudou)'
+      : 'Usuário '+email+' criado'+(enviarLink?' e e-mail de senha enviado':''));
+  }catch(err){
+    errEl.textContent = userErrorMsg(err);
+  }finally{
+    btn.disabled = false; btn.textContent = 'Adicionar usuário';
+  }
+}
+
+async function handleUserAction(btn){
+  const email = btn.dataset.email;
+  const action = btn.dataset.userAction;
+  const u = state.users.find(x=>x.email===email);
+  if(!u) return;
+  try{
+    if(action === 'reset'){
+      await window.Cloud.resetPassword(email);
+      showToast('Link para definir a senha enviado para '+email);
+    } else if(action === 'toggle-admin'){
+      await window.Cloud.setAdmin(email, !u.admin);
+      showToast(email+(u.admin?' agora é editor':' agora é administrador'));
+    } else if(action === 'remove'){
+      if(!confirm('Remover o acesso de '+email+'?\n\nA pessoa continua vendo o painel, mas não poderá mais enviar planilhas nem escrever observações.')) return;
+      await window.Cloud.removeUser(email);
+      showToast('Acesso de '+email+' removido');
+    }
+  }catch(err){
+    showToast('Não foi possível concluir: '+userErrorMsg(err));
+  }
+}
+
+async function claimAdmin(){
+  const btn = document.getElementById('setup-claim');
+  btn.disabled = true;
+  try{
+    await window.Cloud.claimAdmin();
+    showToast('Você agora é administrador do painel');
+  }catch(err){
+    showToast('Não foi possível: '+userErrorMsg(err));
+  }finally{
+    btn.disabled = false;
+  }
 }
 function cloudOnError(err){
   showGlobalError('Firebase: '+(err && err.message ? err.message : err));
@@ -3110,7 +3328,7 @@ function goLocalMode(msg){
 }
 // Observações digitadas antes (só neste navegador) sobem para a base na 1ª vez que alguém loga aqui
 function migrateLocalObs(){
-  if(!state.user || !state.obsLoaded || migrateLocalObs.done || !window.Cloud) return;
+  if(!state.role.editor || !state.obsLoaded || migrateLocalObs.done || !window.Cloud) return;
   migrateLocalObs.done = true;
   const pend = Object.entries(localObsBackup).filter(([k,v])=>v && v.trim() && !state.observacoes[k]);
   if(!pend.length) return;
@@ -3341,6 +3559,12 @@ document.getElementById('logout-btn').addEventListener('click', ()=>{
   flushAllObs();
   window.Cloud.signOut().then(()=>showToast('Você saiu da conta'));
 });
+document.getElementById('user-form').addEventListener('submit', submitNewUser);
+document.getElementById('users-tbody').addEventListener('click', e=>{
+  const btn = e.target.closest('[data-user-action]');
+  if(btn && !btn.disabled) handleUserAction(btn);
+});
+document.getElementById('setup-claim').addEventListener('click', claimAdmin);
 document.getElementById('publish-panel').addEventListener('click', e=>{
   if(e.target.closest('#publish-confirm')) confirmPublish();
   else if(e.target.closest('#publish-cancel')){ cancelPublish(); setUploadStatus('info', 'Publicação cancelada. Nada foi alterado na base.'); }
@@ -3367,8 +3591,8 @@ applyModeUI();
    Se este módulo não carregar (sem internet), o painel segue em modo local.
    ========================================================================== */
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
-import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut, sendPasswordResetEmail } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
-import { getFirestore, doc, collection, query, where, getDocs, onSnapshot, runTransaction, setDoc, deleteDoc, serverTimestamp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut, sendPasswordResetEmail, createUserWithEmailAndPassword } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
+import { getFirestore, doc, collection, query, where, getDocs, onSnapshot, runTransaction, setDoc, updateDoc, deleteDoc, writeBatch, serverTimestamp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 
 const firebaseConfig = {
   apiKey: "AIzaSyCqfgldB0kJF6eQTgdozggkOIJ0q72mDjE",
@@ -3427,7 +3651,40 @@ onSnapshot(obsCol, snap => {
   cloudOnObs(map);
 }, err => cloudOnError(err));
 
-onAuthStateChanged(auth, user => cloudOnAuth(user ? { email: user.email } : null));
+// Usuários: usuarios/{email} define quem pode editar (e quem é administrador)
+const usersCol = collection(db, 'usuarios');
+const setupRef = doc(db, 'config', 'setup');
+let unsubRole = null, unsubUsers = null;
+
+onAuthStateChanged(auth, user => {
+  if(unsubRole){ unsubRole(); unsubRole = null; }
+  if(unsubUsers){ unsubUsers(); unsubUsers = null; }
+  cloudOnAuth(user ? { email: user.email } : null);
+  if(!user) return;
+  const email = String(user.email || '').toLowerCase();
+  unsubRole = onSnapshot(doc(usersCol, email), snap => {
+    const d = snap.exists() ? snap.data() : null;
+    const role = { editor: !!d, admin: !!(d && d.admin === true) };
+    if(role.admin && !unsubUsers){
+      unsubUsers = onSnapshot(usersCol, s => cloudOnUsers(s.docs.map(x => {
+        const u = x.data();
+        return { email: x.id, nome: u.nome || '', admin: u.admin === true, criadoPor: u.criadoPor || '',
+                 criadoEm: u.criadoEm && u.criadoEm.toDate ? u.criadoEm.toDate() : null };
+      })), err => showGlobalError('Firebase (usuários): '+err.message));
+    } else if(!role.admin && unsubUsers){ unsubUsers(); unsubUsers = null; }
+    cloudOnRole(role);
+  }, err => { showGlobalError('Firebase (permissão): '+err.message); cloudOnRole({ editor:false, admin:false }); });
+});
+
+onSnapshot(setupRef, snap => cloudOnSetup(snap.exists()), err => showGlobalError('Firebase (setup): '+err.message));
+
+// Instância secundária do Firebase só para criar contas: assim o administrador
+// não é deslogado quando cadastra outra pessoa.
+let authCadastro = null;
+function getAuthCadastro(){
+  if(!authCadastro) authCadastro = getAuth(initializeApp(firebaseConfig, 'cadastro-usuarios'));
+  return authCadastro;
+}
 
 function splitChunks(rows){
   const chunks = []; let cur = [], size = 2;
@@ -3468,6 +3725,35 @@ window.Cloud = {
       });
       return versao;
     });
+  },
+
+  // Cria a conta no Firebase Authentication (se ainda não existir) e libera o acesso
+  async createUser({ nome, email, senha, admin }){
+    email = String(email).trim().toLowerCase();
+    let existia = false;
+    try{
+      const a = getAuthCadastro();
+      await createUserWithEmailAndPassword(a, email, senha);
+      await signOut(a);
+    }catch(err){
+      if(err && err.code === 'auth/email-already-in-use') existia = true;
+      else throw err;
+    }
+    await setDoc(doc(usersCol, email), { nome, admin: !!admin, criadoPor: auth.currentUser.email, criadoEm: serverTimestamp() });
+    return { existia };
+  },
+  setAdmin: (email, admin) => updateDoc(doc(usersCol, email), { admin: !!admin }),
+  removeUser: email => deleteDoc(doc(usersCol, email)),
+
+  // Primeiro administrador: só funciona enquanto config/setup não existir (garantido pelas regras)
+  async claimAdmin(){
+    const me = auth.currentUser;
+    if(!me) throw new Error('é preciso entrar com sua conta');
+    const email = String(me.email).toLowerCase();
+    const b = writeBatch(db);
+    b.set(doc(usersCol, email), { nome: me.displayName || email.split('@')[0], admin: true, criadoPor: email, criadoEm: serverTimestamp() });
+    b.set(setupRef, { primeiroAdmin: email, em: serverTimestamp() });
+    await b.commit();
   },
 
   saveObs(key, texto){
