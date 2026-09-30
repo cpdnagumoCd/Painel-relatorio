@@ -1,0 +1,54 @@
+# Painel de Notas Fiscais — Nagumo
+
+Painel de acompanhamento das notas fiscais de saída entre empresas do Grupo Nagumo
+que ainda não têm o evento **210200 – Confirmação da Operação**.
+
+- **Site:** publicado pelo GitHub Pages a partir do `index.html` deste repositório.
+- **Dados:** ficam no Firebase (Firestore). A planilha **não** é enviada ao GitHub.
+- **Leitura aberta:** qualquer pessoa com o link vê o painel atualizado.
+- **Login (e-mail e senha):** necessário para enviar a planilha e escrever observações.
+
+## Atualização diária
+
+1. Exporte a base bruta do sistema fiscal (.xlsx), no formato de sempre
+   (`Numero`, `DataEmissao`, `CNPJCPFEmitente`, `RazaoSocialEmitente`, `CnpjCpf`, `RazaoSocial`, `ValorTotal`…).
+2. Abra o site e clique em **Entrar** (menu lateral).
+3. Na aba **Upload de Dados**, arraste a planilha.
+4. Confira o **Resumo da atualização** e clique em **Publicar para todos**.
+
+Como a base é mesclada, sem duplicar notas (chave: CNPJ emitente + CNPJ destinatário + número da nota):
+
+| Situação                                     | Resultado                                  |
+|----------------------------------------------|--------------------------------------------|
+| Nota nova                                    | entra como **pendente**                     |
+| Nota que já estava e continua na base bruta  | continua **pendente**                       |
+| Nota pendente que **sumiu** da base bruta    | vira **resolvida** (operação confirmada)    |
+| Nota resolvida que **voltou** à base bruta   | é **reaberta**                              |
+
+Notas resolvidas não contam como atraso. Elas aparecem na aba **Notas Fiscais**
+pelo filtro *Status → Resolvidas*. As observações ficam ligadas à nota e são
+compartilhadas com todos em tempo real.
+
+> Envie sempre a base bruta **completa** do dia. Uma planilha parcial faria as notas
+> que ficaram de fora serem marcadas como resolvidas. O resumo avisa quando muitas notas
+> vão ser resolvidas de uma vez.
+
+## Configuração do Firebase (uma vez)
+
+Projeto: `relatorio-entre-o-grupo`.
+
+1. **Firestore Database › Regras:** cole o conteúdo de [`firestore.rules`](firestore.rules) e clique em **Publicar**.
+2. **Authentication › Método de login:** ative **E-mail/senha**.
+3. **Authentication › Usuários › Adicionar usuário:** crie uma conta para cada pessoa que vai enviar a planilha ou escrever observações.
+4. **Authentication › Configurações › Ações do usuário:** desmarque **Ativar criação (inscrição)**. Assim ninguém cria conta sozinho.
+5. **Authentication › Configurações › Domínios autorizados:** adicione o domínio do GitHub Pages (`SEU-USUARIO.github.io`).
+
+## Publicação no GitHub Pages
+
+Em **Settings › Pages** do repositório: *Source: Deploy from a branch*, branch `main`, pasta `/ (root)`.
+Cada `git push` na `main` atualiza o site em cerca de 1 minuto.
+
+## Sem internet
+
+Se o Firebase não responder, o painel entra em **modo local**. A planilha é lida
+normalmente, mas os dados e as observações ficam só naquele navegador.

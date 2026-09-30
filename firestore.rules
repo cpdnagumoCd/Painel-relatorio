@@ -1,0 +1,39 @@
+rules_version = '2';
+
+// Regras do Firestore para o Painel de Notas Fiscais.
+// Publique em: Console do Firebase > Firestore Database > Regras.
+//
+// - Leitura aberta: qualquer pessoa com o link do site vê o painel.
+// - Gravação só com login (Firebase Authentication, e-mail e senha).
+//   IMPORTANTE: desative o cadastro público em Authentication > Configurações >
+//   Ações do usuário > "Ativar criação (inscrição)". Assim só as contas criadas
+//   por você no console conseguem enviar a planilha e escrever observações.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function logado() {
+      return request.auth != null;
+    }
+
+    // Dados da última publicação (versão, data, autor, contagens)
+    match /base/{id} {
+      allow read: if true;
+      allow write: if logado();
+    }
+
+    // Base acumulada de notas, dividida em blocos
+    match /base_chunks/{id} {
+      allow read: if true;
+      allow write: if logado();
+    }
+
+    // Uma observação por nota
+    match /observacoes/{id} {
+      allow read: if true;
+      allow create, update: if logado()
+        && request.resource.data.texto is string
+        && request.resource.data.texto.size() <= 500;
+      allow delete: if logado();
+    }
+  }
+}
