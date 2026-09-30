@@ -1469,7 +1469,7 @@ function processWorkbookRows(dataRows, headerRow){
 
   const result = [];
   const seen = new Set();
-  let invalidDates = 0, duplicates = 0;
+  let invalidDates = 0, duplicates = 0, ignored = 0;
   let rowNum = 1;
 
   for(const row of dataRows){
@@ -1477,6 +1477,8 @@ function processWorkbookRows(dataRows, headerRow){
     const cnpjRemRaw = row[mapping.cnpjRemetente];
     const cnpjDestRaw = row[mapping.cnpjDestinatario];
     if((cnpjRemRaw==null || cnpjRemRaw==='') && (cnpjDestRaw==null || cnpjDestRaw==='')) continue;
+    // Linha sem nenhum CNPJ válido (ex.: cabeçalho repetido no meio da planilha) não é nota
+    if(!normalizeDigits(cnpjRemRaw) && !normalizeDigits(cnpjDestRaw)){ ignored++; continue; }
 
     const numeroNFRaw = mapping.numeroNF>-1 ? row[mapping.numeroNF] : '';
     const inv = buildInvoice({
@@ -1496,7 +1498,7 @@ function processWorkbookRows(dataRows, headerRow){
     result.push(inv);
   }
 
-  return { data: result, invalidDates, duplicates, mapping: mapping, headerRow: headerRow };
+  return { data: result, invalidDates, duplicates, ignored, mapping: mapping, headerRow: headerRow };
 }
 
 // Monta o objeto de nota usado em todo o painel — tanto a partir da planilha
@@ -1639,6 +1641,18 @@ function computeCompanyAggregates(invoices){
     if(!inv.dataEmissao) rec.semData++;
   }
   return Array.from(map.values()).map(r=>({...r, pct: r.total? r.emAtraso/r.total*100 : 0})).sort((a,b)=>b.total-a.total);
+}
+
+// Todas as empresas/CDs cadastrados (código >= 500) entram na lista, mesmo sem notas (total 0)
+const MASTER_EMPRESAS = MASTER_STORES_RAW
+  .filter(([,codigo])=>classifyTipo(codigo)==='Empresa/CD')
+  .map(([,codigo,nome])=>codigo+' - '+nome);
+function withZeroCompanies(agg){
+  const names = new Set(agg.map(c=>c.nome));
+  const zeros = MASTER_EMPRESAS.filter(n=>!names.has(n))
+    .sort((a,b)=>a.localeCompare(b,'pt-BR',{numeric:true}))
+    .map(nome=>({nome, total:0, emAtraso:0, semData:0, pct:0}));
+  return agg.concat(zeros);
 }
 
 function computeStoreAggregates(invoices){
@@ -1787,14 +1801,14 @@ function renderAgingBar(){
 
 function renderCompanyFilters(){
   const container = document.getElementById('company-filter-list');
-  container.innerHTML = state.dash.companyAgg.map(c=>(
+  container.innerHTML = withZeroCompanies(state.dash.companyAgg).map(c=>(
     '<label class="chip"><input type="checkbox" data-role="company-filter" value="'+escapeHtml(c.nome)+'" '+(state.selectedCompanies.has(c.nome)?'checked':'')+'><span>'+escapeHtml(c.nome)+'</span></label>'
   )).join('') || '<span class="empty-note">Nenhuma empresa remetente encontrada.</span>';
 }
 
 function renderCompanyChart(){
   const container = document.getElementById('company-chart-body');
-  const filtered = state.dash.companyAgg.filter(c=>state.selectedCompanies.has(c.nome));
+  const filtered = withZeroCompanies(state.dash.companyAgg).filter(c=>state.selectedCompanies.has(c.nome));
   if(!filtered.length){
     container.innerHTML = '<p class="empty-note">Nenhuma empresa selecionada no filtro acima.</p>';
     return;
@@ -2077,7 +2091,7 @@ function renderLojasTab(){
     ? fmtInt(sortedLojas.length)+' de '+fmtInt(state.storeAgg.length)+' loja(s)'
     : fmtInt(state.storeAgg.length)+' loja(s) · '+fmtInt(state.storeAgg.filter(s=>s.emAtraso>0).length)+' com notas em atraso';
 
-  const sortedEmpresas = sortGeneric(state.companyAgg, state.empresasSort.col, state.empresasSort.dir);
+  const sortedEmpresas = sortGeneric(withZeroCompanies(state.companyAgg), state.empresasSort.col, state.empresasSort.dir);
   const tbody2 = document.getElementById('empresas-tbody');
   tbody2.innerHTML = sortedEmpresas.map(c=>(
     '<tr>'+
@@ -2954,7 +2968,7 @@ function onDataLoaded(fileLabel){
   state.allInvoices.forEach(inv=>{ inv.valorFmt = inv.valor!=null ? fmtMoney(inv.valor) : undefined; });
   state.companyAgg = computeCompanyAggregates(state.invoices);
   state.storeAgg = computeStoreAggregates(state.invoices);
-  if(isNewFile) state.selectedCompanies = new Set(state.companyAgg.map(c=>c.nome));
+  if(isNewFile) state.selectedCompanies = new Set(withZeroCompanies(state.companyAgg).map(c=>c.nome));
   renderMonthFilter();
   computeDashData();
 
@@ -3098,6 +3112,7 @@ async function handleFile(file){
 
   let msg = 'Planilha lida: '+fmtInt(result.data.length)+' nota(s).';
   if(result.duplicates) msg += ' '+fmtInt(result.duplicates)+' linha(s) repetida(s) ignorada(s).';
+  if(result.ignored) msg += ' '+fmtInt(result.ignored)+' linha(s) sem CNPJ (ex.: cabeçalho repetido) ignorada(s).';
   if(result.invalidDates) msg += ' Atenção: '+fmtInt(result.invalidDates)+' nota(s) sem data de emissão reconhecida.';
 
   if(state.mode === 'cloud'){
@@ -3178,7 +3193,8 @@ function cloudOnData(meta, rows){
   const wasConnecting = state.mode === 'connecting';
   state.mode = 'cloud';
   state.cloudMeta = meta;
-  state.allInvoices = rows.map(rowToInvoice);
+  // descarta registros sem nenhum CNPJ (lixo de uploads antigos); somem da base no próximo envio
+  state.allInvoices = rows.map(rowToInvoice).filter(i=>i.cnpjRemetente || i.cnpjDestinatario);
   onDataLoaded(meta.arquivo || 'Base online');
   applyModeUI();
   if(cloudFirstData && state.activeTab === 'upload' && state.allInvoices.length) showTab('dashboard');
@@ -3429,7 +3445,7 @@ document.getElementById('dash-month').addEventListener('change', e=>{
   renderDashboardTab();
 });
 document.getElementById('companies-select-all').addEventListener('click', ()=>{
-  state.selectedCompanies = new Set(state.companyAgg.map(c=>c.nome));
+  state.selectedCompanies = new Set(withZeroCompanies(state.companyAgg).map(c=>c.nome));
   renderCompanyFilters(); renderCompanyChart();
 });
 document.getElementById('companies-select-none').addEventListener('click', ()=>{
