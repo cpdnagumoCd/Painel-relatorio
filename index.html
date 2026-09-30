@@ -2152,457 +2152,404 @@ function drawPdfFooter(doc, opts){
   }
 }
 
-// Observação da nota: impressa como uma linha logo abaixo da linha da nota,
-// ocupando a largura toda da tabela (quebra o texto em várias linhas se preciso).
-const PDF_OBS_FONT = 7.2, PDF_OBS_LINE = 3.3;
-function pdfObsLayout(doc, inv, width){
-  const obs = getObs(inv).trim();
-  if(!obs) return null;
-  const prevFont = doc.getFont(), prevSize = doc.getFontSize();
-  const prefix = 'Obs.: ';
-  doc.setFont('helvetica','bold'); doc.setFontSize(PDF_OBS_FONT);
-  const prefixW = doc.getTextWidth(prefix);
-  doc.setFont('helvetica','italic');
-  const lines = doc.splitTextToSize(obs, width - 5 - prefixW);
-  doc.setFont(prevFont.fontName, prevFont.fontStyle); doc.setFontSize(prevSize);
-  return { lines, prefix, prefixW, h: lines.length*PDF_OBS_LINE + 1 };
-}
-function drawPdfObs(doc, layout, x, y, width, fill){
-  const prevFont = doc.getFont(), prevSize = doc.getFontSize();
-  doc.setFillColor(fill[0],fill[1],fill[2]);
-  doc.rect(x, y, width, layout.h, 'F');
-  doc.setFillColor(14,139,129);
-  doc.rect(x, y, 0.8, layout.h, 'F');
-  doc.setFontSize(PDF_OBS_FONT);
-  doc.setFont('helvetica','bold'); doc.setTextColor(14,139,129);
-  doc.text(layout.prefix, x+2.5, y+2.5);
-  doc.setFont('helvetica','italic'); doc.setTextColor(11,37,64);
-  layout.lines.forEach((ln, i)=>{ doc.text(ln, x+2.5+layout.prefixW, y+2.5+i*PDF_OBS_LINE); });
-  doc.setFont(prevFont.fontName, prevFont.fontStyle); doc.setFontSize(prevSize);
-  return layout.h;
-}
+/* ==========================================================================
+   PDFs — linguagem visual comum
+   - Avaliação automática no topo (selo + frases que não repetem os números)
+   - Distribuição das notas por situação
+   - Notas agrupadas por situação (cada nota aparece UMA vez): Crítico,
+     Atraso alto, Atraso recente, No prazo, Sem data (e Resolvidas, se filtradas)
+   ========================================================================== */
+const PDF_C = {
+  ink:[11,37,64], soft:[87,112,138], faint:[147,166,184], line:[226,232,238],
+  bg:[243,246,248], zebra:[248,250,252], navy:[0,56,101], teal:[14,139,129], red:[214,0,52]
+};
+const PDF_GRUPOS = [
+  {id:'critico',  titulo:'Crítico',            desc:()=> '21 dias ou mais de atraso',          cor:[122,0,38],   tint:[252,233,238]},
+  {id:'alto',     titulo:'Atraso alto',        desc:()=> '8 a 20 dias de atraso',              cor:[214,0,52]},
+  {id:'recente',  titulo:'Atraso recente',     desc:()=> '1 a 7 dias de atraso',               cor:[226,108,10]},
+  {id:'prazo',    titulo:'No prazo',           desc:()=> 'até '+state.prazoLimite+' dias desde a emissão', cor:[14,139,129]},
+  {id:'semdata',  titulo:'Sem data de emissão',desc:()=> 'não é possível calcular o prazo',    cor:[147,166,184]},
+  {id:'resolvida',titulo:'Resolvidas',         desc:()=> 'saíram da base bruta',               cor:[0,56,101]}
+];
+const PDF_GRUPO = Object.fromEntries(PDF_GRUPOS.map(g=>[g.id,g]));
+const pdfFill = (doc,c)=>doc.setFillColor(c[0],c[1],c[2]);
+const pdfInk = (doc,c)=>doc.setTextColor(c[0],c[1],c[2]);
+const pdfFont = (doc,style,size)=>{ doc.setFont('helvetica',style); doc.setFontSize(size); };
 
 // Mais atrasadas primeiro; notas sem data (dias = null) vão para o fim.
 function byMostOverdue(a,b){
   return (b.diasEmAtraso||0)-(a.diasEmAtraso||0) ||
          (b.diasDesdeEmissao==null?-1:b.diasDesdeEmissao)-(a.diasDesdeEmissao==null?-1:a.diasDesdeEmissao);
 }
-
-/* ---------- Tabela de notas para PDF (usada nos relatórios de notas e de loja) ----------
-   Cada nota é uma linha; a coluna Observação quebra o texto dentro da própria célula
-   e a linha cresce só o necessário. Gravidade do atraso = faixa colorida à esquerda. */
 function pdfTruncate(doc, text, maxW){
   text = String(text==null?'':text);
   if(doc.getTextWidth(text) <= maxW) return text;
   while(text.length > 1 && doc.getTextWidth(text+'…') > maxW) text = text.slice(0,-1);
   return text.trimEnd()+'…';
 }
-function pdfSeverityColor(inv){
-  if(!inv.emAtraso) return null;
-  if(inv.diasEmAtraso >= 21) return [214,0,52];
-  if(inv.diasEmAtraso >= 8) return [236,124,151];
-  return null;
+function pdfGrupo(inv){
+  if(inv.resolvida) return 'resolvida';
+  if(!inv.dataEmissao) return 'semdata';
+  if(!inv.emAtraso) return 'prazo';
+  if(inv.diasEmAtraso >= 21) return 'critico';
+  if(inv.diasEmAtraso >= 8) return 'alto';
+  return 'recente';
 }
-function pdfStatusCell(inv){
-  if(inv.resolvida) return {text:'Resolvida', color:[0,56,101], bold:true};
-  if(inv.emAtraso) return {text:'Em atraso', color:[214,0,52], bold:true};
-  if(!inv.dataEmissao) return {text:'Sem data', color:[140,160,179], bold:true};
-  return {text:'No prazo', color:[14,139,129], bold:true};
+function pdfAgrupar(list){
+  const g = {}; PDF_GRUPOS.forEach(x=>g[x.id]=[]);
+  list.forEach(i=>g[pdfGrupo(i)].push(i));
+  ['critico','alto','recente'].forEach(k=>g[k].sort(byMostOverdue));
+  g.prazo.sort((a,b)=>b.diasDesdeEmissao-a.diasDesdeEmissao);            // quem vence primeiro, primeiro
+  g.semdata.sort((a,b)=>String(a.numeroNF).localeCompare(String(b.numeroNF),'pt-BR',{numeric:true}));
+  g.resolvida.sort((a,b)=>(b.resolvidaEm||0)-(a.resolvidaEm||0));
+  return g;
 }
-// Colunas prontas; a Observação ocupa a largura que sobrar
+function topBy(list, keyFn){
+  const m = new Map(); list.forEach(i=>{ const k=keyFn(i); m.set(k,(m.get(k)||0)+1); });
+  return [...m.entries()].sort((a,b)=>b[1]-a[1])[0] || null;
+}
+
+// Avaliação: selo + frases objetivas que complementam (não repetem) os indicadores
+function pdfAvaliacao(list, opts){
+  opts = opts || {};
+  const pend = list.filter(i=>!i.resolvida);
+  const atras = pend.filter(i=>i.emAtraso);
+  const g = pdfAgrupar(list);
+  const n = pend.length;
+  let nivel;
+  if(!n) nivel = {txt:'SEM PENDÊNCIAS', cor:PDF_C.teal};
+  else if(!atras.length) nivel = {txt:'EM DIA', cor:PDF_C.teal};
+  else if(g.critico.length && g.critico.length/n >= 0.10) nivel = {txt:'CRÍTICO', cor:PDF_GRUPO.critico.cor};
+  else if(g.critico.length || atras.length/n >= 0.30) nivel = {txt:'ATENÇÃO', cor:PDF_GRUPO.alto.cor};
+  else nivel = {txt:'SOB CONTROLE', cor:PDF_GRUPO.recente.cor};
+
+  const frases = [];
+  const maisAntiga = atras.slice().sort(byMostOverdue)[0];
+  if(maisAntiga){
+    frases.push('A nota mais antiga em aberto é a NF '+maisAntiga.numeroNF+
+      (opts.umaLoja ? '' : ' ('+maisAntiga.nomeDestinatario+')')+
+      ', emitida em '+maisAntiga.dataEmissaoFmt+' — '+fmtInt(maisAntiga.diasEmAtraso)+' dias além do prazo.');
+  }
+  if(atras.length){
+    const t = opts.umaLoja ? topBy(atras, i=>i.nomeRemetente) : topBy(atras, i=>i.nomeDestinatario);
+    if(t) frases.push((opts.umaLoja ? 'Remetente com mais notas em atraso: ' : 'Maior concentração de atraso: ')+
+      t[0]+' — '+fmtInt(t[1])+' nota(s), '+fmtDec(t[1]/atras.length*100,0)+'% dos atrasos.');
+  }
+  if(g.critico.length) frases.push(fmtInt(g.critico.length)+' nota(s) passaram de 21 dias de atraso e pedem ação imediata.');
+  const venceHoje = g.prazo.filter(i=>i.diasDesdeEmissao >= state.prazoLimite).length;
+  if(venceHoje) frases.push(fmtInt(venceHoje)+' nota(s) no prazo vencem hoje e entram em atraso amanhã.');
+  if(atras.length){
+    const semObs = atras.filter(i=>!getObs(i).trim()).length;
+    frases.push(semObs ? fmtInt(semObs)+' das notas em atraso ainda não têm observação registrada.'
+                       : 'Todas as notas em atraso já têm observação registrada.');
+  } else if(n){
+    frases.push('Nenhuma nota passou do prazo de '+state.prazoLimite+' dias.');
+  }
+  return { nivel, frases, g, pend, atras };
+}
+
+function pdfKpis(av, extra){
+  const n = av.pend.length, a = av.atras.length;
+  const media = a ? av.atras.reduce((s,i)=>s+i.diasEmAtraso,0)/a : 0;
+  const k = [
+    {label:'Notas pendentes', value:fmtInt(n)},
+    {label:'Em atraso', value:fmtInt(a), sub:n ? fmtDec(a/n*100,0)+'% das pendentes' : '', cor:a?PDF_C.red:null},
+    {label:'Média de atraso', value:a ? fmtDec(media,1)+' dias' : '—', sub:'entre as atrasadas'}
+  ];
+  return k.concat(extra ? [extra] : []);
+}
+
+// Painel: avaliação (esquerda) + 4 indicadores (direita)
+function pdfDrawAvaliacao(doc, x, y, w, av, kpis){
+  const gap = 5, leftW = w*0.57, rightW = w - leftW - gap;
+  pdfFont(doc,'normal',8.3);
+  const blocos = av.frases.map(f=>doc.splitTextToSize(f, leftW-17));
+  const textH = blocos.reduce((s,b)=>s+b.length*3.7+1.6, 0);
+  const h = Math.max(42, 19 + textH + 3);
+
+  pdfFill(doc, PDF_C.bg); doc.roundedRect(x, y, leftW, h, 2.5, 2.5, 'F');
+  pdfFill(doc, av.nivel.cor); doc.rect(x, y+2, 1.6, h-4, 'F');
+  pdfFont(doc,'bold',7); pdfInk(doc, PDF_C.soft); doc.text('AVALIAÇÃO', x+7, y+7.2);
+  pdfFont(doc,'bold',8.4);
+  const pillW = doc.getTextWidth(av.nivel.txt)+12;
+  pdfFill(doc, av.nivel.cor); doc.roundedRect(x+7, y+9.3, pillW, 6.6, 3.3, 3.3, 'F');
+  pdfInk(doc, [255,255,255]); doc.text(av.nivel.txt, x+7+pillW/2, y+13.9, {align:'center'});
+  let ty = y + 21.5;
+  pdfFont(doc,'normal',8.3);
+  blocos.forEach(b=>{
+    pdfFill(doc, av.nivel.cor); doc.circle(x+8.3, ty-1.1, 0.7, 'F');
+    pdfInk(doc, PDF_C.ink);
+    b.forEach((ln,i)=>doc.text(ln, x+11, ty + i*3.7));
+    ty += b.length*3.7 + 1.6;
+  });
+
+  const kw = (rightW-gap)/2, kh = (h-gap)/2;
+  kpis.slice(0,4).forEach((k,i)=>{
+    const kx = x + leftW + gap + (i%2)*(kw+gap), ky = y + Math.floor(i/2)*(kh+gap);
+    doc.setDrawColor(PDF_C.line[0],PDF_C.line[1],PDF_C.line[2]); doc.setLineWidth(0.25);
+    doc.setFillColor(255,255,255); doc.roundedRect(kx, ky, kw, kh, 2, 2, 'FD');
+    pdfFont(doc,'normal',7); pdfInk(doc, PDF_C.soft); doc.text(k.label, kx+4, ky+5.8);
+    pdfFont(doc,'bold',14); pdfInk(doc, k.cor || PDF_C.navy); doc.text(pdfTruncate(doc, k.value, kw-8), kx+4, ky+kh/2+3.6);
+    if(k.sub){ pdfFont(doc,'normal',6.6); pdfInk(doc, PDF_C.faint); doc.text(pdfTruncate(doc,k.sub,kw-8), kx+4, ky+kh-2.6); }
+  });
+  return y + h;
+}
+
+// Barra de distribuição por situação
+function pdfDrawDistribuicao(doc, x, y, w, g, ids){
+  const itens = ids.map(id=>({g:PDF_GRUPO[id], n:g[id].length})).filter(i=>i.n>0);
+  const total = itens.reduce((s,i)=>s+i.n,0);
+  if(!total) return y;
+  pdfFont(doc,'bold',9); pdfInk(doc, PDF_C.ink); doc.text('Distribuição das notas por situação', x, y);
+  y += 3.2;
+  const barH = 7.5;
+  pdfFill(doc, PDF_C.bg); doc.roundedRect(x, y, w, barH, 2, 2, 'F');
+  let bx = x;
+  itens.forEach(it=>{
+    const sw = it.n/total*w;
+    pdfFill(doc, it.g.cor); doc.rect(bx, y, sw, barH, 'F');
+    pdfFont(doc,'bold',7);
+    const lbl = fmtInt(it.n);
+    if(sw > doc.getTextWidth(lbl)+4){ pdfInk(doc,[255,255,255]); doc.text(lbl, bx+sw/2, y+5, {align:'center'}); }
+    bx += sw;
+  });
+  y += barH + 5;
+  let lx = x;
+  itens.forEach(it=>{
+    pdfFont(doc,'bold',7.4);
+    const pct = it.n/total*100;
+    const t1 = it.g.titulo, t2 = '  '+fmtInt(it.n)+' ('+(pct>0 && pct<1 ? fmtDec(pct,1) : fmtDec(pct,0))+'%)';
+    const wLabel = doc.getTextWidth(t1) + (pdfFont(doc,'normal',7.4), doc.getTextWidth(t2)) + 12;
+    if(lx + wLabel > x + w){ lx = x; y += 4.6; }
+    pdfFill(doc, it.g.cor); doc.roundedRect(lx, y-2.6, 2.8, 2.8, 0.6, 0.6, 'F');
+    pdfFont(doc,'bold',7.4); pdfInk(doc, PDF_C.ink); doc.text(t1, lx+4.2, y);
+    const w1 = doc.getTextWidth(t1);
+    pdfFont(doc,'normal',7.4); pdfInk(doc, PDF_C.soft); doc.text(t2, lx+4.2+w1, y);
+    lx += wLabel;
+  });
+  return y + 3;
+}
+
+/* ---------- Colunas das tabelas de notas ---------- */
 const PDF_COLS = {
-  nota:      {label:'Nota', w:21, cell:i=>({text:i.numeroNF, bold:true})},
-  loja:      {label:'Loja', w:42, cell:i=>({text:i.nomeDestinatario})},
-  remetente: {label:'Remetente', w:40, cell:i=>({text:i.nomeRemetente})},
-  emissao:   {label:'Emissão', w:19, cell:i=>({text:i.dataEmissaoFmt})},
-  dias:      {label:'Dias', w:11, align:'right', cell:i=>({text:i.diasDesdeEmissao!=null?String(i.diasDesdeEmissao):'—'})},
-  status:    {label:'Status', w:20, cell:pdfStatusCell},
-  atraso:    {label:'Atraso', w:15, align:'right', cell:i=>i.emAtraso ? {text:fmtInt(i.diasEmAtraso)+'d', color:[214,0,52], bold:true} : {text:'—', color:[140,160,179]}},
-  valor:     {label:'Valor (R$)', w:23, align:'right', cell:i=>({text:i.valor!=null ? fmtMoney(i.valor).replace('R$','').trim() : '—'})},
-  obs:       {label:'Observação', w:0, wrap:true, cell:i=>{ const o=getObs(i).trim(); return o ? {text:o} : {text:'—', color:[190,200,210]}; }}
+  nota:      {label:'Nota', w:20, cell:i=>({text:i.numeroNF, bold:true})},
+  loja:      {label:'Loja', w:40, cell:i=>({text:i.nomeDestinatario})},
+  remetente: {label:'Remetente', w:36, cell:i=>({text:i.nomeRemetente})},
+  emissao:   {label:'Emissão', w:21, cell:i=>({text:i.dataEmissaoFmt})},
+  situacao:  {label:'Atraso / prazo', w:24, align:'right', cell:i=>{
+    const g = PDF_GRUPO[pdfGrupo(i)];
+    if(i.resolvida) return {text:'resolvida '+(i.resolvidaEm?formatDateBR(i.resolvidaEm).slice(0,5):''), color:g.cor, bold:true};
+    if(!i.dataEmissao) return {text:'—', color:PDF_C.faint};
+    if(i.emAtraso) return {text:fmtInt(i.diasEmAtraso)+(i.diasEmAtraso===1?' dia':' dias'), color:g.cor, bold:true, size:i.diasEmAtraso>=21?8.6:7.8};
+    const falta = state.prazoLimite - i.diasDesdeEmissao;
+    return {text: falta<=0 ? 'vence hoje' : 'vence em '+falta+'d', color:g.cor, bold:falta<=0};
+  }},
+  valor:     {label:'Valor (R$)', w:22, align:'right', cell:i=>({text:i.valor!=null ? fmtMoney(i.valor).replace('R$','').trim() : '—'})},
+  obs:       {label:'Observação', w:0, wrap:true, cell:i=>{ const o=getObs(i).trim(); return o ? {text:o} : {text:'—', color:[200,208,216]}; }}
 };
 
-function drawPdfNotesTable(doc, o){
-  // o: {x, y, width, cols:[...], rows, pageH, headerFill, onNewPage:()=>novoY}
-  const FS = 7.6, LINE = 3.25, PAD = 1.8, HEAD_H = 7.2, BOTTOM = 14;
+// Seções por situação: faixa colorida + tabela; quebra de página repete faixa e cabeçalho
+function pdfDrawSecoes(doc, o){
+  // o: {x, y, width, pageH, grupos, ids, cols, onNewPage}
+  const FS = 7.6, LINE = 3.25, PAD = 1.8, BAND_H = 8, HEAD_H = 5.8, BOTTOM = 14;
   const fixed = o.cols.reduce((s,c)=>s+(c.w||0),0);
   const cols = o.cols.map(c=> c.w ? c : Object.assign({}, c, {w: o.width - fixed}));
-  const drawHeader = yy=>{
-    doc.setFillColor(o.headerFill[0],o.headerFill[1],o.headerFill[2]);
-    doc.rect(o.x, yy, o.width, HEAD_H, 'F');
-    doc.setFont('helvetica','bold'); doc.setFontSize(7.4); doc.setTextColor(255,255,255);
+  let y = o.y;
+  const band = (g, lista, cont)=>{
+    pdfFill(doc, g.cor); doc.roundedRect(o.x, y, o.width, BAND_H, 1.6, 1.6, 'F');
+    pdfFont(doc,'bold',8.8); pdfInk(doc,[255,255,255]);
+    doc.text(g.titulo.toUpperCase()+(cont?'  (continuação)':''), o.x+4, y+5.4);
+    const tw = doc.getTextWidth(g.titulo.toUpperCase()+(cont?'  (continuação)':''));
+    pdfFont(doc,'normal',7.6); doc.text('·  '+g.desc(), o.x+4+tw+3, y+5.4);
+    const valor = lista.reduce((s,i)=>s+(i.valor||0),0);
+    const dir = fmtInt(lista.length)+(lista.length===1?' nota':' notas')+(lista.some(i=>i.valor!=null)?'  ·  '+fmtMoney(valor):'');
+    pdfFont(doc,'bold',8.2); doc.text(dir, o.x+o.width-4, y+5.4, {align:'right'});
+    y += BAND_H + 1;
+    pdfFill(doc, PDF_C.bg); doc.rect(o.x, y, o.width, HEAD_H, 'F');
+    pdfFont(doc,'bold',6.9); pdfInk(doc, PDF_C.soft);
     let cx = o.x;
     cols.forEach(c=>{
-      if(c.align==='right') doc.text(c.label, cx+c.w-2, yy+4.8, {align:'right'});
-      else doc.text(c.label, cx+2.4, yy+4.8);
+      if(c.align==='right') doc.text(c.label.toUpperCase(), cx+c.w-2.4, y+3.9, {align:'right'});
+      else doc.text(c.label.toUpperCase(), cx+2.4, y+3.9);
       cx += c.w;
     });
-    return yy + HEAD_H;
+    y += HEAD_H;
   };
-  let y = drawHeader(o.y);
-  o.rows.forEach((inv, idx)=>{
-    // monta as células (com quebra só na observação) para saber a altura da linha
-    const cells = cols.map(c=>{
-      const v = c.cell(inv);
-      doc.setFont('helvetica', v.bold?'bold':'normal'); doc.setFontSize(FS);
-      const lines = c.wrap ? doc.splitTextToSize(String(v.text), c.w-4.4) : [pdfTruncate(doc, v.text, c.w-4.4)];
-      return {c, v, lines};
-    });
-    const nLines = Math.max(...cells.map(k=>k.lines.length));
-    const rowH = Math.max(6.4, nLines*LINE + PAD*2);
-    if(y + rowH > o.pageH - BOTTOM){ y = drawHeader(o.onNewPage()); }
-    if(idx % 2 === 1){ doc.setFillColor(247,249,251); doc.rect(o.x, y, o.width, rowH, 'F'); }
-    const sev = pdfSeverityColor(inv);
-    if(sev){ doc.setFillColor(sev[0],sev[1],sev[2]); doc.rect(o.x, y, 1.1, rowH, 'F'); }
-    let cx = o.x;
-    cells.forEach(({c, v, lines})=>{
-      doc.setFont('helvetica', v.bold?'bold':'normal'); doc.setFontSize(FS);
-      const col = v.color || [11,37,64];
-      doc.setTextColor(col[0],col[1],col[2]);
-      lines.forEach((ln, li)=>{
-        const by = y + PAD + 2.45 + li*LINE;
-        if(c.align==='right') doc.text(ln, cx+c.w-2, by, {align:'right'});
-        else doc.text(ln, cx+2.4, by);
+  o.ids.forEach(id=>{
+    const lista = o.grupos[id];
+    if(!lista || !lista.length) return;
+    const g = PDF_GRUPO[id];
+    if(y + BAND_H + HEAD_H + 8 > o.pageH - BOTTOM) y = o.onNewPage();
+    band(g, lista, false);
+    lista.forEach((inv, idx)=>{
+      const cells = cols.map(c=>{
+        const v = c.cell(inv);
+        pdfFont(doc, v.bold?'bold':'normal', v.size||FS);
+        const lines = c.wrap ? doc.splitTextToSize(String(v.text), c.w-4.8) : [pdfTruncate(doc, v.text, c.w-4.8)];
+        return {c, v, lines};
       });
-      cx += c.w;
+      const rowH = Math.max(6.2, Math.max(...cells.map(k=>k.lines.length))*LINE + PAD*2);
+      if(y + rowH > o.pageH - BOTTOM){ y = o.onNewPage(); band(g, lista, true); }
+      if(g.tint){ pdfFill(doc, idx%2 ? [248,238,241] : g.tint); doc.rect(o.x, y, o.width, rowH, 'F'); }
+      else if(idx%2){ pdfFill(doc, PDF_C.zebra); doc.rect(o.x, y, o.width, rowH, 'F'); }
+      pdfFill(doc, g.cor); doc.rect(o.x, y, 0.9, rowH, 'F');
+      let cx = o.x;
+      cells.forEach(({c, v, lines})=>{
+        pdfFont(doc, v.bold?'bold':'normal', v.size||FS);
+        pdfInk(doc, v.color || PDF_C.ink);
+        lines.forEach((ln, li)=>{
+          const by = y + PAD + 2.45 + li*LINE;
+          if(c.align==='right') doc.text(ln, cx+c.w-2.4, by, {align:'right'});
+          else doc.text(ln, cx+2.4, by);
+        });
+        cx += c.w;
+      });
+      doc.setDrawColor(PDF_C.line[0],PDF_C.line[1],PDF_C.line[2]); doc.setLineWidth(0.12);
+      doc.line(o.x, y+rowH, o.x+o.width, y+rowH);
+      y += rowH;
     });
-    doc.setDrawColor(226,232,238); doc.setLineWidth(0.15);
-    doc.line(o.x, y+rowH, o.x+o.width, y+rowH);
-    y += rowH;
+    y += 7;
   });
   return y;
 }
 
-// Título de seção + legenda da faixa de gravidade
-function drawPdfSectionTitle(doc, text, x, y, width, color){
-  doc.setFont('helvetica','bold'); doc.setFontSize(9.5);
-  doc.setTextColor(color[0],color[1],color[2]);
-  doc.text(text, x, y);
-  doc.setFont('helvetica','normal'); doc.setFontSize(6.8); doc.setTextColor(120,138,156);
-  const leg = 'Faixa à esquerda:  vermelha = 21+ dias de atraso   ·   rosa = 8 a 20 dias';
-  doc.text(leg, x+width, y, {align:'right'});
-  doc.setFillColor(214,0,52); doc.rect(x+width-doc.getTextWidth(leg)-3.2, y-2.4, 1.1, 2.8, 'F');
-  return y + 4;
-}
-
-function drawPdfKpiBoxes(doc, boxDefs, x, y, width, qtdAtraso){
-  const gap = 6, boxW = (width - gap*(boxDefs.length-1)) / boxDefs.length;
-  boxDefs.forEach((b,idx)=>{
-    const bx = x + idx*(boxW+gap);
-    doc.setDrawColor(225,232,238); doc.setFillColor(243,246,248);
-    doc.roundedRect(bx,y,boxW,17,2,2,'FD');
-    doc.setFont('helvetica','normal'); doc.setFontSize(7.3); doc.setTextColor(87,112,138);
-    doc.text(b[0], bx+4, y+6.5);
-    doc.setFont('helvetica','bold'); doc.setFontSize(11.5);
-    if(b[2]) doc.setTextColor(b[2][0],b[2][1],b[2][2]); else doc.setTextColor(0,56,101);
-    doc.text(b[1], bx+4, y+13.6);
-  });
-  return y + 17;
-}
-
-function buildStorePDF(storeName, storeInvoices, cnpjFmt){
+function pdfNovoDoc(){
   const { jsPDF } = window.jspdf;
-  const doc = new jsPDF({unit:'mm', format:'a4', orientation:'landscape'});
-  const pageW = 297, pageH = 210, marginX = 12, width = pageW - marginX*2;
-  const headerTitle = 'Relatório de Notas Fiscais';
-  const headerSubtitle = 'Gerado em '+formatDateBR(new Date())+' · prazo limite: '+state.prazoLimite+' dias';
-  const newPage = ()=>{ doc.addPage(); return drawPdfHeader(doc, {pageW, marginX, title:headerTitle+' — '+storeName, compact:true}) + 6; };
+  return new jsPDF({unit:'mm', format:'a4', orientation:'landscape'});
+}
+const PDF_PAGE = { w:297, h:210, m:12 };
 
-  let y = drawPdfHeader(doc, {pageW, marginX, title:headerTitle, subtitle:headerSubtitle, compact:false}) + 9;
-  doc.setTextColor(11,37,64); doc.setFont('helvetica','bold'); doc.setFontSize(13);
-  doc.text(storeName, marginX, y);
-  y += 5.5;
-  doc.setFont('helvetica','normal'); doc.setFontSize(9.5); doc.setTextColor(87,112,138);
-  doc.text('CNPJ: '+(cnpjFmt||'—'), marginX, y);
-  y += 7;
+/* ---------- PDF de uma loja ---------- */
+function buildStorePDF(storeName, storeInvoices, cnpjFmt){
+  const doc = pdfNovoDoc();
+  const {w:pageW, h:pageH, m:marginX} = PDF_PAGE, width = pageW - marginX*2;
+  const title = 'Notas Fiscais da Loja';
+  const newPage = ()=>{ doc.addPage(); return drawPdfHeader(doc, {pageW, marginX, title:title+' · '+storeName, compact:true}) + 7; };
+  let y = drawPdfHeader(doc, {pageW, marginX, title, subtitle:'Gerado em '+fmtDateTimeBR(new Date())+' · prazo limite: '+state.prazoLimite+' dias', compact:false}) + 10;
 
-  const total = storeInvoices.length;
-  const atrasadas = storeInvoices.filter(i=>i.emAtraso);
-  const qtd = atrasadas.length;
-  const temValor = storeInvoices.some(i=>i.valor!=null);
+  pdfFont(doc,'bold',15); pdfInk(doc, PDF_C.ink); doc.text(storeName, marginX, y);
+  const nw = doc.getTextWidth(storeName);
+  pdfFont(doc,'normal',9); pdfInk(doc, PDF_C.soft); doc.text('CNPJ '+(cnpjFmt||'—'), marginX+nw+5, y);
+  y += 6;
 
-  if(total===0){
-    doc.setDrawColor(225,232,238); doc.setFillColor(243,246,248);
-    doc.roundedRect(marginX,y,width,20,3,3,'FD');
-    doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(87,112,138);
-    doc.text('Nenhuma nota fiscal encontrada para esta loja.', marginX+8, y+12);
+  if(!storeInvoices.length){
+    pdfFont(doc,'bold',11); pdfInk(doc, PDF_C.soft); doc.text('Nenhuma nota fiscal encontrada para esta loja.', marginX, y+8);
     drawPdfFooter(doc, {pageW, pageH, marginX});
     return doc;
   }
+  const av = pdfAvaliacao(storeInvoices, {umaLoja:true});
+  const temValor = storeInvoices.some(i=>i.valor!=null);
+  const extra = temValor
+    ? {label:'Valor em atraso', value:fmtMoney(av.atras.reduce((s,i)=>s+(i.valor||0),0)), cor:av.atras.length?PDF_C.red:null}
+    : {label:'No prazo', value:fmtInt(av.g.prazo.length), cor:PDF_C.teal};
+  y = pdfDrawAvaliacao(doc, marginX, y, width, av, pdfKpis(av, extra)) + 8;
+  const ids = ['critico','alto','recente','prazo','semdata','resolvida'];
+  y = pdfDrawDistribuicao(doc, marginX, y, width, av.g, ids) + 7;
 
-  const media = qtd ? atrasadas.reduce((s,i)=>s+i.diasEmAtraso,0)/qtd : 0;
-  const comData = storeInvoices.filter(i=>i.diasDesdeEmissao!=null);
-  let maisAntiga = null;
-  comData.forEach(i=>{ if(!maisAntiga || i.diasDesdeEmissao > maisAntiga.diasDesdeEmissao) maisAntiga = i; });
-  const comObs = storeInvoices.filter(i=>getObs(i).trim()).length;
-  const boxDefs = [
-    ['Total de Notas', fmtInt(total)],
-    ['Notas em Atraso', fmtInt(qtd), qtd?[214,0,52]:null],
-    ['Média Dias em Atraso', qtd ? fmtDec(media,1) : '—'],
-    ['Nota Mais Antiga', maisAntiga ? formatDateBR(maisAntiga.dataEmissao)+' ('+maisAntiga.diasDesdeEmissao+'d)' : '—'],
-    ['Com Observação', fmtInt(comObs), [14,139,129]]
-  ];
-  if(temValor) boxDefs.splice(3, 0, ['Valor em Atraso', fmtMoney(atrasadas.reduce((s,i)=>s+(i.valor||0),0))]);
-  y = drawPdfKpiBoxes(doc, boxDefs, marginX, y, width, qtd) + 9;
-
-  if(qtd===0){
-    doc.setDrawColor(180,230,222); doc.setFillColor(227,251,248);
-    doc.roundedRect(marginX,y,width,12,3,3,'FD');
-    doc.setFont('helvetica','bold'); doc.setFontSize(10); doc.setTextColor(14,139,129);
-    doc.text('Nenhuma nota em atraso — todas as notas desta loja estão dentro do prazo.', marginX+8, y+7.8);
-    y += 12 + 8;
-  } else if(qtd > 3){
-    // Destaque: as 3 notas com mais dias em atraso
-    doc.setFont('helvetica','bold'); doc.setFontSize(9.5); doc.setTextColor(214,0,52);
-    doc.text('MAIOR ATENÇÃO — notas com mais dias em atraso', marginX, y);
-    y += 4.5;
-    const destaques = atrasadas.slice().sort((a,b)=>b.diasEmAtraso-a.diasEmAtraso).slice(0,3);
-    const dGap = 6, dW = (width - dGap*2)/3;
-    destaques.forEach((inv, idx)=>{
-      const x = marginX + idx*(dW+dGap);
-      doc.setDrawColor(236,124,151); doc.setFillColor(253,234,240);
-      doc.roundedRect(x,y,dW,19,2,2,'FD');
-      doc.setFont('helvetica','bold'); doc.setFontSize(7.8); doc.setTextColor(160,0,41);
-      doc.text('NF '+inv.numeroNF, x+4, y+6);
-      doc.setFont('helvetica','normal'); doc.setFontSize(7.2); doc.setTextColor(87,112,138);
-      doc.text(pdfTruncate(doc, inv.nomeRemetente+' · emitida em '+inv.dataEmissaoFmt, dW-40), x+4, y+11);
-      doc.setFont('helvetica','bold'); doc.setFontSize(14); doc.setTextColor(214,0,52);
-      doc.text(fmtInt(inv.diasEmAtraso)+'d', x+dW-4, y+12, {align:'right'});
-      const obs = getObs(inv).trim();
-      doc.setFont('helvetica', obs?'italic':'normal'); doc.setFontSize(6.9); doc.setTextColor(obs?11:160, obs?37:175, obs?64:190);
-      doc.text(pdfTruncate(doc, obs ? 'Obs.: '+obs : 'Sem observação', dW-8), x+4, y+16);
-    });
-    y += 19 + 9;
-  }
-
-  const sorted = [...storeInvoices].sort(byMostOverdue);
-  y = drawPdfSectionTitle(doc, 'Todas as notas desta loja ('+fmtInt(total)+') — mais atrasadas primeiro', marginX, y, width, [11,37,64]);
   const C = PDF_COLS;
-  const cols = [C.nota, C.remetente, C.emissao, C.dias, C.status, C.atraso].concat(temValor?[C.valor]:[]).concat([C.obs]);
-  drawPdfNotesTable(doc, {x:marginX, y, width, cols, rows:sorted, pageH, headerFill:[0,56,101], onNewPage:newPage});
-
+  const cols = [C.nota, C.remetente, C.emissao, C.situacao].concat(temValor?[C.valor]:[]).concat([C.obs]);
+  pdfDrawSecoes(doc, {x:marginX, y, width, pageH, grupos:av.g, ids, cols, onNewPage:newPage});
   drawPdfFooter(doc, {pageW, pageH, marginX});
   return doc;
 }
 
+/* ---------- PDF do dashboard (resumo executivo; respeita o filtro de mês) ---------- */
 function buildDashboardPDF(){
-  const { jsPDF } = window.jspdf;
-  const doc = new jsPDF({unit:'mm', format:'a4', orientation:'landscape'});
-  const pageW = 297, pageH = 210, marginX = 14;
-  const headerTitle = 'Resumo Executivo — Notas Fiscais';
-  const headerSubtitle = 'Gerado em '+formatDateBR(new Date())+' · prazo limite: '+state.prazoLimite+' dias · '+(state.dashMonth==='all' ? 'todos os meses' : 'emissão em '+monthLabel(state.dashMonth).toLowerCase());
+  const doc = pdfNovoDoc();
+  const {w:pageW, h:pageH, m:marginX} = PDF_PAGE, width = pageW - marginX*2;
+  const title = 'Resumo Executivo — Notas Fiscais';
+  const periodo = state.dashMonth==='all' ? 'todos os meses' : 'emissão em '+monthLabel(state.dashMonth).toLowerCase();
+  const newPage = ()=>{ doc.addPage(); return drawPdfHeader(doc, {pageW, marginX, title, compact:true}) + 8; };
+  let y = drawPdfHeader(doc, {pageW, marginX, title, subtitle:'Gerado em '+fmtDateTimeBR(new Date())+' · prazo limite: '+state.prazoLimite+' dias · '+periodo, compact:false}) + 9;
 
-  let y = drawPdfHeader(doc, {pageW, marginX, title:headerTitle, subtitle:headerSubtitle, compact:false}) + 10;
+  const invoices = state.dash.invoices;
+  const av = pdfAvaliacao(invoices, {umaLoja:false});
+  y = pdfDrawAvaliacao(doc, marginX, y, width, av,
+        pdfKpis(av, {label:'Notas resolvidas', value:fmtInt(state.dash.resolvidas.length), sub:'saíram da base bruta', cor:PDF_C.teal})) + 8;
+  y = pdfDrawDistribuicao(doc, marginX, y, width, av.g, ['critico','alto','recente','prazo','semdata']) + 9;
 
-  const invoices = state.dash.invoices;   // respeita o filtro de mês do dashboard
-  const total = invoices.length;
-  const atrasadas = invoices.filter(i=>i.emAtraso);
-  const qtdAtraso = atrasadas.length;
-  const mediaDias = qtdAtraso ? atrasadas.reduce((s,i)=>s+i.diasEmAtraso,0)/qtdAtraso : 0;
-  const lojasComPendencia = new Set(atrasadas.map(i=>i.nomeDestinatario)).size;
-  const totalLojas = new Set(invoices.map(i=>i.nomeDestinatario)).size;
+  // --- Rankings lado a lado ---
+  const colGap = 10, colW = (width - colGap)/2;
+  const lojas = state.dash.storeAgg.filter(s=>s.emAtraso>0).sort((a,b)=>b.emAtraso-a.emAtraso || b.maxDias-a.maxDias).slice(0,10);
+  const empresas = withZeroCompanies(state.dash.companyAgg).slice().sort((a,b)=>b.total-a.total);
+  const rowH = 6.2;
+  const needed = 10 + Math.max(lojas.length, empresas.length, 1)*rowH;
+  if(y + needed > pageH - 14) y = newPage();
+  const topY = y;
 
-  const kpis = [
-    ['Total de Notas', fmtInt(total), [0,56,101]],
-    ['Notas em Atraso', fmtInt(qtdAtraso), [214,0,52]],
-    ['Média Dias em Atraso', fmtDec(mediaDias,1), [214,0,52]],
-    ['Lojas com Pendência', fmtInt(lojasComPendencia)+' / '+fmtInt(totalLojas), [14,139,129]]
-  ];
-  kpis.push(['Notas Resolvidas', fmtInt(state.dash.resolvidas.length), [14,139,129]]);
-  const kGap = 6, kBoxH = 24, kPerRow = kpis.length;
-  const kBoxW = (pageW - marginX*2 - kGap*(kPerRow-1))/kPerRow;
-  kpis.forEach((k,idx)=>{
-    const x = marginX + idx*(kBoxW+kGap);
-    doc.setDrawColor(225,232,238); doc.setFillColor(243,246,248);
-    doc.roundedRect(x,y,kBoxW,kBoxH,2,2,'FD');
-    doc.setFillColor(k[2][0],k[2][1],k[2][2]);
-    doc.rect(x,y,1.3,kBoxH,'F');
-    doc.setFont('helvetica','normal'); doc.setFontSize(7.2); doc.setTextColor(87,112,138);
-    doc.text(k[0], x+4.5, y+7.5, {maxWidth:kBoxW-7});
-    doc.setFont('helvetica','bold'); doc.setFontSize(15.5); doc.setTextColor(0,56,101);
-    doc.text(k[1], x+4.5, y+17.5);
+  function rankTitle(x, t, s){
+    pdfFont(doc,'bold',9); pdfInk(doc, PDF_C.ink); doc.text(t, x, topY);
+    pdfFont(doc,'normal',7); pdfInk(doc, PDF_C.soft); doc.text(s, x+colW, topY, {align:'right'});
+  }
+  rankTitle(marginX, 'Lojas com mais notas em atraso', 'notas em atraso · maior atraso');
+  let ly = topY + 5;
+  const maxL = Math.max(1, ...lojas.map(s=>s.emAtraso));
+  if(!lojas.length){ pdfFont(doc,'normal',8); pdfInk(doc,PDF_C.faint); doc.text('Nenhuma loja com notas em atraso.', marginX, ly+4); }
+  lojas.forEach((s,i)=>{
+    const sev = s.maxDias-state.prazoLimite >= 21 ? PDF_GRUPO.critico.cor : s.maxDias-state.prazoLimite >= 8 ? PDF_GRUPO.alto.cor : PDF_GRUPO.recente.cor;
+    pdfFont(doc,'bold',7.2); pdfInk(doc, PDF_C.soft); doc.text(String(i+1), marginX+2, ly+4.1);
+    pdfFont(doc,'bold',7.6); pdfInk(doc, PDF_C.ink); doc.text(pdfTruncate(doc, s.nome, 44), marginX+7, ly+4.1);
+    const bx = marginX+53, bw = colW-53-30;
+    pdfFill(doc, PDF_C.bg); doc.roundedRect(bx, ly+1.6, bw, 3.2, 1, 1, 'F');
+    pdfFill(doc, sev); doc.roundedRect(bx, ly+1.6, Math.max(1.5, s.emAtraso/maxL*bw), 3.2, 1, 1, 'F');
+    pdfFont(doc,'bold',7.6); pdfInk(doc, PDF_C.ink); doc.text(fmtInt(s.emAtraso), marginX+colW-15, ly+4.1, {align:'right'});
+    pdfFont(doc,'bold',7.4); pdfInk(doc, sev); doc.text(fmtInt(s.maxDias-state.prazoLimite)+'d', marginX+colW, ly+4.1, {align:'right'});
+    ly += rowH;
   });
-  y += kBoxH + 11;
 
-  // --- Destaque: nota mais antiga em aberto (o ponto de partida deste resumo) ---
-  // Vermelho domina quando há atraso; azul/navy domina quando está tudo em dia —
-  // mesma lógica de cor usada na interface (overdue-highlight / overdue-highlight--clear).
-  function drawOverdueHighlight(hy){
-    const hlH = 34;
-    const overdueInv = findMostOverdueInvoice(invoices);
-    if(!overdueInv){
-      doc.setFillColor(0,56,101);
-      doc.roundedRect(marginX,hy,pageW-marginX*2,hlH,3,3,'F');
-      doc.setFillColor(53,214,199);
-      doc.rect(marginX,hy,1.6,hlH,'F');
-      doc.setTextColor(255,255,255);
-      doc.setFont('helvetica','bold'); doc.setFontSize(8.4);
-      doc.text('TUDO EM DIA', marginX+10, hy+11);
-      doc.setFont('helvetica','normal'); doc.setFontSize(10.8);
-      doc.text('Nenhuma nota em atraso — todas dentro do prazo limite de '+fmtInt(state.prazoLimite)+' dia(s).', marginX+10, hy+21, {maxWidth:pageW-marginX*2-20});
-      return hy+hlH;
-    }
-    doc.setFillColor(158,0,39);
-    doc.roundedRect(marginX,hy,pageW-marginX*2,hlH,3,3,'F');
-    doc.setFillColor(0,31,56);
-    doc.rect(marginX,hy,1.6,hlH,'F');
+  const ex = marginX + colW + colGap;
+  rankTitle(ex, 'Empresas remetentes', 'no prazo · em atraso');
+  let ey = topY + 5;
+  const maxE = Math.max(1, ...empresas.map(c=>c.total));
+  empresas.forEach(c=>{
+    pdfFont(doc,'bold',7.6); pdfInk(doc, c.total?PDF_C.ink:PDF_C.faint); doc.text(pdfTruncate(doc, c.nome, 40), ex, ey+4.1);
+    const bx = ex+44, bw = colW-44-30;
+    pdfFill(doc, PDF_C.bg); doc.roundedRect(bx, ey+1.6, bw, 3.2, 1, 1, 'F');
+    const noPrazo = c.total - c.emAtraso - (c.semData||0);
+    if(noPrazo>0){ pdfFill(doc, PDF_GRUPO.prazo.cor); doc.rect(bx, ey+1.6, noPrazo/maxE*bw, 3.2, 'F'); }
+    if(c.emAtraso>0){ pdfFill(doc, PDF_C.red); doc.rect(bx+noPrazo/maxE*bw, ey+1.6, Math.max(0.8, c.emAtraso/maxE*bw), 3.2, 'F'); }
+    pdfFont(doc,'bold',7.6); pdfInk(doc, c.total?PDF_C.ink:PDF_C.faint); doc.text(fmtInt(c.total), ex+colW-12, ey+4.1, {align:'right'});
+    pdfFont(doc,'bold',7.4); pdfInk(doc, c.emAtraso?PDF_C.red:PDF_C.faint); doc.text(fmtInt(c.emAtraso), ex+colW, ey+4.1, {align:'right'});
+    ey += rowH;
+  });
+  y = Math.max(ly, ey) + 9;
 
-    const padL = 10;
-    doc.setTextColor(255,214,224); doc.setFont('helvetica','bold'); doc.setFontSize(8);
-    doc.text('NOTA MAIS ANTIGA EM ABERTO', marginX+padL, hy+9);
-
-    doc.setTextColor(255,255,255); doc.setFont('helvetica','bold'); doc.setFontSize(19);
-    doc.text(overdueInv.dataEmissaoFmt, marginX+padL, hy+20);
-
-    doc.setFont('helvetica','normal'); doc.setFontSize(8.6); doc.setTextColor(255,228,234);
-    doc.text(fmtInt(overdueInv.diasDesdeEmissao)+' dias desde a emissão  ·  '+fmtInt(overdueInv.diasEmAtraso)+' dias além do prazo de '+fmtInt(state.prazoLimite)+'d', marginX+padL, hy+27);
-
-    doc.setFont('helvetica','normal'); doc.setFontSize(7.5); doc.setTextColor(240,190,203);
-    doc.text('NF '+String(overdueInv.numeroNF)+'  ·  '+String(overdueInv.nomeDestinatario)+'  ·  remetente '+String(overdueInv.nomeRemetente), marginX+padL, hy+hlH-4.3, {maxWidth:pageW-marginX*2-padL*2});
-
-    return hy+hlH;
-  }
-  if(y > pageH - 34 - 20){ doc.addPage(); y = drawPdfHeader(doc,{pageW,marginX,title:headerTitle,compact:true}) + 10; }
-  y = drawOverdueHighlight(y);
-  const overdueForObs = findMostOverdueInvoice(invoices);
-  const overdueObs = overdueForObs ? pdfObsLayout(doc, overdueForObs, pageW-marginX*2) : null;
-  if(overdueObs){
-    y += 2;
-    y += drawPdfObs(doc, overdueObs, marginX, y, pageW-marginX*2, [253,234,240]);
-  }
-  y += 11;
-
-  // --- Notas Emitidas por Dia: o motivo deste painel, sempre com os atrasos em destaque ---
-  if(y > pageH - 40){ doc.addPage(); y = drawPdfHeader(doc,{pageW,marginX,title:headerTitle,compact:true}) + 10; }
-  doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(11,37,64);
-  doc.text('Notas Emitidas por Dia', marginX, y);
-  doc.setFont('helvetica','normal'); doc.setFontSize(7.4); doc.setTextColor(87,112,138);
-  doc.text('cada barra é um dia de emissão — vermelha assim que ultrapassa o prazo limite, azul enquanto está no prazo', marginX+53, y);
-  y += 7.5;
-
+  // --- Notas emitidas por dia (colunas) ---
   const days = computeDailyEmissions(invoices);
-  if(!days.length){
-    doc.setFont('helvetica','normal'); doc.setFontSize(8.5); doc.setTextColor(140,160,179);
-    doc.text('Nenhuma nota com data de emissão reconhecida.', marginX, y+4);
-    y += 12;
-  } else {
-    const maxCount = Math.max(1, ...days.map(d=>d.count));
-    const rowH = 5.3, labelW = 22, valueW = 16;
-    const barX = marginX+labelW, barMaxW = pageW-marginX*2-labelW-valueW;
-    let dividerDrawn = false;
-    days.forEach((d, idx)=>{
-      if(y > pageH - 18){ doc.addPage(); y = drawPdfHeader(doc,{pageW,marginX,title:headerTitle,compact:true}) + 9; }
-      if(!dividerDrawn && idx>0 && days[idx-1].emAtraso && !d.emAtraso){
-        doc.setFont('helvetica','bold'); doc.setFontSize(6.3); doc.setTextColor(140,160,179);
-        doc.text('LIMITE DO PRAZO · '+fmtInt(state.prazoLimite)+' DIA(S)', pageW/2, y+2, {align:'center'});
-        y += 4;
-        doc.setDrawColor(190,198,206); doc.setLineWidth(0.25);
-        doc.setLineDashPattern([0.8,0.8],0);
-        doc.line(marginX, y, pageW-marginX, y);
-        doc.setLineDashPattern([],0);
-        y += 3.6;
-        dividerDrawn = true;
-        if(y > pageH - 18){ doc.addPage(); y = drawPdfHeader(doc,{pageW,marginX,title:headerTitle,compact:true}) + 9; }
-      }
-      doc.setFont('helvetica','normal'); doc.setFontSize(6.9); doc.setTextColor(87,112,138);
-      doc.text(d.dateFmt, marginX, y+3.3);
-      const barLen = Math.max(0.8, d.count/maxCount*barMaxW);
-      if(d.emAtraso) doc.setFillColor(214,0,52); else doc.setFillColor(11,76,124);
-      doc.roundedRect(barX, y, barLen, 3.5, 1, 1, 'F');
-      doc.setFont('helvetica','bold'); doc.setFontSize(7.1); doc.setTextColor(11,37,64);
-      doc.text(fmtInt(d.count), barX+barMaxW+3, y+3.1);
-      y += rowH;
+  if(days.length){
+    const chartH = 34;
+    if(y + chartH + 16 > pageH - 14) y = newPage();
+    pdfFont(doc,'bold',9); pdfInk(doc, PDF_C.ink); doc.text('Notas emitidas por dia', marginX, y);
+    pdfFont(doc,'normal',7); pdfInk(doc, PDF_C.soft);
+    doc.text('vermelho = já passou do prazo  ·  azul = ainda no prazo', marginX+width, y, {align:'right'});
+    y += 4;
+    const maxC = Math.max(1, ...days.map(d=>d.count));
+    const slot = width/days.length, bw = Math.min(9, slot*0.7);
+    const every = Math.ceil(days.length/40);
+    days.forEach((d,i)=>{
+      const h = Math.max(0.8, d.count/maxC*chartH);
+      const cx = marginX + i*slot + (slot-bw)/2;
+      pdfFill(doc, d.emAtraso ? PDF_C.red : PDF_C.navy);
+      doc.rect(cx, y+chartH-h, bw, h, 'F');
+      if(slot >= 6){ pdfFont(doc,'bold',6.2); pdfInk(doc, PDF_C.ink); doc.text(fmtInt(d.count), cx+bw/2, y+chartH-h-1, {align:'center'}); }
+      if(i % every === 0){ pdfFont(doc,'normal',5.8); pdfInk(doc, PDF_C.soft); doc.text(d.dateFmt.slice(0,5), cx+bw/2, y+chartH+3.4, {align:'center'}); }
     });
-    y += 6.5;
+    doc.setDrawColor(PDF_C.line[0],PDF_C.line[1],PDF_C.line[2]); doc.setLineWidth(0.2);
+    doc.line(marginX, y+chartH, marginX+width, y+chartH);
+    y += chartH + 11;
   }
 
-  // --- Termômetro de atraso (mantido) ---
-  if(y > pageH - 40){ doc.addPage(); y = drawPdfHeader(doc,{pageW,marginX,title:headerTitle,compact:true}) + 10; }
-  doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(11,37,64);
-  doc.text('Distribuição das notas por tempo desde a emissão', marginX, y);
-  y += 7;
-  const buckets = computeAgingBuckets(invoices);
-  const totalBk = buckets.reduce((s,b)=>s+b.count,0) || 1;
-  const barColorsRGB = [[53,214,199],[246,199,210],[236,124,151],[214,0,52],[122,0,38]];
-  const barW = pageW - marginX*2, barH = 8;
-  let bx = marginX;
-  buckets.forEach((b,idx)=>{
-    const w = (b.count/totalBk)*barW;
-    doc.setFillColor(barColorsRGB[idx][0],barColorsRGB[idx][1],barColorsRGB[idx][2]);
-    if(w>0.05) doc.rect(bx,y,w,barH,'F');
-    bx += w;
-  });
-  y += barH + 6.5;
-  doc.setFontSize(7.4);
-  let lx = marginX, ly = y;
-  buckets.forEach((b,idx)=>{
-    const label = b.label+': '+fmtInt(b.count)+' ('+fmtDec(totalBk?b.count/totalBk*100:0,0)+'%)';
-    const lw = doc.getTextWidth(label)+11;
-    if(lx + lw > pageW - marginX){ lx = marginX; ly += 5.5; }
-    doc.setFillColor(barColorsRGB[idx][0],barColorsRGB[idx][1],barColorsRGB[idx][2]);
-    doc.rect(lx, ly-2.6, 2.6,2.6,'F');
-    doc.setTextColor(87,112,138); doc.setFont('helvetica','normal');
-    doc.text(label, lx+4, ly);
-    lx += lw;
-  });
-  y = ly + 11;
-
-  // --- Empresas Remetentes / Lojas Ofensoras (mantidos) ---
-  if(y > pageH - 75){ doc.addPage(); y = drawPdfHeader(doc,{pageW,marginX,title:headerTitle,compact:true}) + 10; }
-  const colGap = 10;
-  const colW = (pageW - marginX*2 - colGap)/2;
-  const leftX = marginX, rightX = marginX + colW + colGap;
-  const tableTopY = y;
-
-  function drawMiniTable(x, title, rows, headerCols, emptyMsg){
-    doc.setFont('helvetica','bold'); doc.setFontSize(10); doc.setTextColor(11,37,64);
-    doc.text(title, x, tableTopY);
-    let ty = tableTopY + 5;
-    doc.setFillColor(0,56,101);
-    doc.rect(x,ty,colW,6.5,'F');
-    doc.setTextColor(255,255,255); doc.setFont('helvetica','bold'); doc.setFontSize(7.2);
-    let cx = x;
-    headerCols.forEach(c=>{ doc.text(c.label, cx+2, ty+4.3); cx+=c.w; });
-    ty += 6.5;
-    if(!rows.length){
-      doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(140,160,179);
-      doc.text(emptyMsg, x+2, ty+5);
-      return ty+9;
-    }
-    doc.setFont('helvetica','normal'); doc.setFontSize(7.6);
-    rows.forEach((r,idx)=>{
-      if(idx%2===0){ doc.setFillColor(247,249,250); doc.rect(x,ty,colW,6,'F'); }
-      let cx2 = x;
-      headerCols.forEach(c=>{
-        if(c.emphasis){ doc.setTextColor(214,0,52); doc.setFont('helvetica','bold'); }
-        else { doc.setTextColor(11,37,64); doc.setFont('helvetica','normal'); }
-        let val = String(r[c.key]!=null ? r[c.key] : '—');
-        if(c.maxChars) val = val.slice(0,c.maxChars);
-        doc.text(val, cx2+2, ty+4.2);
-        cx2 += c.w;
-      });
-      ty += 6;
-    });
-    return ty;
+  // --- As 10 notas mais antigas em atraso ---
+  const top = av.atras.slice().sort(byMostOverdue).slice(0,10);
+  if(top.length){
+    if(y + 30 > pageH - 14) y = newPage();
+    pdfFont(doc,'bold',9); pdfInk(doc, PDF_C.ink); doc.text('As '+top.length+' notas mais antigas em atraso', marginX, y);
+    y += 3.5;
+    const g = pdfAgrupar(top);
+    const C = PDF_COLS;
+    pdfDrawSecoes(doc, {x:marginX, y, width, pageH, grupos:g, ids:['critico','alto','recente'],
+      cols:[C.nota, C.loja, C.remetente, C.emissao, C.situacao, C.obs], onNewPage:newPage});
   }
-
-  const topEmpresas = [...state.dash.companyAgg].sort((a,b)=>b.emAtraso-a.emAtraso||b.total-a.total).slice(0,8)
-    .map(c=>({ nome:c.nome, total:fmtInt(c.total), emAtraso:fmtInt(c.emAtraso), pctStr:fmtDec(c.pct,0)+'%' }));
-  const topLojas = [...state.dash.storeAgg].filter(s=>s.emAtraso>0).sort((a,b)=>b.emAtraso-a.emAtraso).slice(0,8)
-    .map(s=>({ nome:s.nome, emAtraso:fmtInt(s.emAtraso), diasStr:fmtDec(s.mediaDiasAtraso,0)+'d' }));
-
-  drawMiniTable(leftX, 'Empresas Remetentes (top 8)', topEmpresas, [
-    {label:'Empresa', key:'nome', w:colW-46, maxChars:34},
-    {label:'Total', key:'total', w:16},
-    {label:'Atraso', key:'emAtraso', w:15, emphasis:true},
-    {label:'%', key:'pctStr', w:15, emphasis:true}
-  ], 'Nenhuma empresa encontrada.');
-
-  drawMiniTable(rightX, 'Lojas Ofensoras (top 8)', topLojas, [
-    {label:'Loja', key:'nome', w:colW-40, maxChars:32},
-    {label:'Atraso', key:'emAtraso', w:20, emphasis:true},
-    {label:'Dias Médio', key:'diasStr', w:20, emphasis:true}
-  ], 'Nenhuma loja com pendências.');
 
   drawPdfFooter(doc, {pageW, pageH, marginX});
   return doc;
@@ -2634,65 +2581,38 @@ function describeNotasFilters(){
   return parts.length ? ('Filtros aplicados — '+parts.join(' · ')) : 'Nenhum filtro aplicado — todas as notas da base';
 }
 
+/* ---------- PDF das notas (usa os filtros da aba Notas Fiscais) ---------- */
 function buildNotasReportPDF(){
-  const { jsPDF } = window.jspdf;
-  const doc = new jsPDF({unit:'mm', format:'a4', orientation:'landscape'});
-  const pageW = 297, pageH = 210, marginX = 12, width = pageW - marginX*2;
-  const headerTitle = 'Relatório de Notas Fiscais — Mais Antigas';
-  const headerSubtitle = 'Gerado em '+formatDateBR(new Date())+' · prazo limite: '+state.prazoLimite+' dias';
-  const newPage = ()=>{ doc.addPage(); return drawPdfHeader(doc, {pageW, marginX, title:headerTitle, compact:true}) + 6; };
+  const doc = pdfNovoDoc();
+  const {w:pageW, h:pageH, m:marginX} = PDF_PAGE, width = pageW - marginX*2;
+  const title = 'Relatório de Notas Fiscais';
+  const newPage = ()=>{ doc.addPage(); return drawPdfHeader(doc, {pageW, marginX, title, compact:true}) + 7; };
+  let y = drawPdfHeader(doc, {pageW, marginX, title, subtitle:'Gerado em '+fmtDateTimeBR(new Date())+' · prazo limite: '+state.prazoLimite+' dias', compact:false}) + 8;
 
-  let y = drawPdfHeader(doc, {pageW, marginX, title:headerTitle, subtitle:headerSubtitle, compact:false}) + 8;
-
-  doc.setFont('helvetica','italic'); doc.setFontSize(8.5); doc.setTextColor(87,112,138);
+  pdfFont(doc,'italic',8.2); pdfInk(doc, PDF_C.soft);
   doc.text(describeNotasFilters(), marginX, y, {maxWidth:width});
   y += 6;
 
-  const filtered = getFilteredNotas();
-  const sorted = [...filtered].sort(byMostOverdue);
-  const total = sorted.length;
-  const atrasadas = sorted.filter(i=>i.emAtraso);
-  const qtd = atrasadas.length;
-  const media = qtd ? atrasadas.reduce((s,i)=>s+i.diasEmAtraso,0)/qtd : 0;
-  const temValor = sorted.some(i=>i.valor!=null);
-  const comObs = sorted.filter(i=>getObs(i).trim()).length;
-
-  const boxDefs = [
-    ['Notas no Filtro', fmtInt(total)],
-    ['Em Atraso', fmtInt(qtd), qtd?[214,0,52]:null],
-    ['Média Dias em Atraso', qtd ? fmtDec(media,1) : '—'],
-    temValor ? ['Valor em Atraso', fmtMoney(atrasadas.reduce((s,i)=>s+(i.valor||0),0))]
-             : ['Lojas Envolvidas', fmtInt(new Set(sorted.map(i=>i.nomeDestinatario)).size)],
-    ['Com Observação', fmtInt(comObs), [14,139,129]]
-  ];
-  y = drawPdfKpiBoxes(doc, boxDefs, marginX, y, width, qtd) + 9;
-
-  if(total===0){
-    doc.setDrawColor(225,232,238); doc.setFillColor(243,246,248);
-    doc.roundedRect(marginX,y,width,20,3,3,'FD');
-    doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(87,112,138);
-    doc.text('Nenhuma nota encontrada com os filtros selecionados.', marginX+8, y+12);
+  const lista = getFilteredNotas();
+  if(!lista.length){
+    pdfFont(doc,'bold',11); pdfInk(doc, PDF_C.soft); doc.text('Nenhuma nota encontrada com os filtros selecionados.', marginX, y+8);
     drawPdfFooter(doc, {pageW, pageH, marginX});
     return doc;
   }
-
-  const C = PDF_COLS;
-
-  // --- Destaque: as 10 notas mais antigas em atraso ---
-  if(qtd > 0){
-    const topN = atrasadas.slice(0, Math.min(10, qtd));
-    if(y > pageH - 50) y = newPage();
-    y = drawPdfSectionTitle(doc, 'MAIOR ATENÇÃO — as '+topN.length+' notas mais antigas em atraso', marginX, y, width, [214,0,52]);
-    y = drawPdfNotesTable(doc, {x:marginX, y, width, rows:topN, pageH, headerFill:[214,0,52], onNewPage:newPage,
-      cols:[C.nota, C.loja, C.remetente, C.emissao, C.atraso, C.obs]}) + 10;
+  const av = pdfAvaliacao(lista, {umaLoja:false});
+  const temValor = lista.some(i=>i.valor!=null);
+  const ids = ['critico','alto','recente','prazo','semdata','resolvida'];
+  if(av.pend.length){
+    const extra = temValor
+      ? {label:'Valor em atraso', value:fmtMoney(av.atras.reduce((s,i)=>s+(i.valor||0),0)), cor:av.atras.length?PDF_C.red:null}
+      : {label:'Lojas envolvidas', value:fmtInt(new Set(av.pend.map(i=>i.nomeDestinatario)).size)};
+    y = pdfDrawAvaliacao(doc, marginX, y, width, av, pdfKpis(av, extra)) + 8;
+    y = pdfDrawDistribuicao(doc, marginX, y, width, av.g, ids) + 7;
   }
 
-  // --- Lista completa (respeita os filtros aplicados na aba Notas Fiscais) ---
-  if(y > pageH - 45) y = newPage();
-  y = drawPdfSectionTitle(doc, 'Todas as notas do filtro ('+fmtInt(total)+') — mais antigas primeiro', marginX, y, width, [11,37,64]);
-  const cols = [C.nota, C.remetente, C.loja, C.emissao, C.dias, C.status, C.atraso].concat(temValor?[C.valor]:[]).concat([C.obs]);
-  drawPdfNotesTable(doc, {x:marginX, y, width, cols, rows:sorted, pageH, headerFill:[0,56,101], onNewPage:newPage});
-
+  const C = PDF_COLS;
+  const cols = [C.nota, C.loja, C.remetente, C.emissao, C.situacao].concat(temValor?[C.valor]:[]).concat([C.obs]);
+  pdfDrawSecoes(doc, {x:marginX, y, width, pageH, grupos:av.g, ids, cols, onNewPage:newPage});
   drawPdfFooter(doc, {pageW, pageH, marginX});
   return doc;
 }
