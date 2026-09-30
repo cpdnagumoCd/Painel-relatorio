@@ -29,7 +29,8 @@ service cloud.firestore {
     // Dados da última publicação (versão, data, autor, contagens)
     match /base/{id} {
       allow read: if true;
-      allow write: if editor();
+      allow create, update: if editor();
+      allow delete: if admin();   // "Limpar todos os dados" — só administradores
     }
 
     // Base acumulada de notas, dividida em blocos

@@ -53,6 +53,12 @@ Na aba **Usuários** (visível só para administradores):
 - **Tornar admin / Tirar admin:** administradores também cadastram e removem usuários.
 - **Remover acesso:** tira a permissão de edição na hora. Para apagar a conta de vez: console › Authentication › Usuários.
 
+## Limpar todos os dados
+
+No fim da aba **Upload de Dados**, só administradores veem **Limpar todos os dados**.
+Essa opção apaga, para todos, a base de notas (pendentes e resolvidas) e todas as observações.
+Os usuários e as permissões continuam. Para confirmar, é preciso digitar `LIMPAR`. Não há como desfazer.
+
 ## Publicação no GitHub Pages
 
 Em **Settings › Pages** do repositório: *Source: Deploy from a branch*, branch `main`, pasta `/ (root)`.

@@ -269,6 +269,10 @@ svg{display:block;}
 .btn-accent:disabled{background:var(--line);color:var(--ink-faint);cursor:not-allowed;}
 .btn-secondary{background:#fff;color:var(--navy);border-color:var(--line);}
 .btn-secondary:hover{border-color:var(--navy);}
+.btn-danger{background:var(--red);color:#fff;}
+.btn-danger:hover{background:var(--red-dark);}
+.btn-danger:disabled{background:var(--line);color:var(--ink-faint);cursor:not-allowed;}
+.danger-card{border-color:#F4C2CF;}
 .btn-ghost{background:transparent;color:var(--ink-soft);border-color:transparent;padding:10px 12px;}
 .btn-ghost:hover{color:var(--navy);background:var(--bg);}
 .btn-mini{background:var(--navy);color:#fff;border:none;border-radius:7px;padding:6px 11px;font-size:11.5px;font-weight:700;white-space:nowrap;}
@@ -354,28 +358,13 @@ table.data-table tbody tr:hover td.empty-note{background:#fff;}
 .upload-status.info{background:var(--bg);color:var(--ink-soft);}
 .upload-status.success{background:var(--teal-tint);color:var(--teal-dark);}
 .upload-status.error{background:var(--red-tint);color:var(--red-dark);}
-#column-mapping-panel{margin-top:4px;}
-.mapping-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:8px;margin-top:10px;}
-.mapping-item{display:flex;align-items:center;justify-content:space-between;gap:8px;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px 11px;font-size:12px;}
-.mapping-item .m-field{color:var(--ink-soft);font-weight:700;}
-.mapping-item .m-col{color:var(--navy-deep);font-weight:800;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.mapping-item.m-missing .m-col{color:var(--ink-faint);font-weight:600;}
-.mapping-item.m-ok{border-color:var(--teal);}
 .sample-link-row{margin-top:14px;text-align:center;}
 .sample-link-btn{background:none;border:none;padding:0;font-size:12.5px;font-weight:700;color:var(--navy);text-decoration:underline;text-underline-offset:2px;}
-.instructions-list{display:flex;flex-direction:column;gap:12px;margin-top:14px;}
-.instructions-item{display:flex;gap:11px;font-size:13px;color:var(--ink-soft);align-items:flex-start;}
-.instructions-num{width:22px;height:22px;border-radius:7px;background:var(--navy);color:#fff;flex:none;font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;margin-top:1px;}
-.instructions-num--ok{background:var(--teal-dark);}
-.instructions-item b{color:var(--ink);}
-.field-pill{display:inline-block;background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:1px 6px;margin:1px 0;font-size:11.5px;font-weight:700;color:var(--navy);font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;}
 details.master-details summary{cursor:pointer;font-size:13.5px;font-weight:800;color:var(--navy-deep);list-style:none;display:flex;align-items:center;gap:8px;}
 details.master-details summary::-webkit-details-marker{display:none;}
 details.master-details summary::before{content:"▸";color:var(--teal-dark);transition:.15s;}
 details.master-details[open] summary::before{transform:rotate(90deg);}
 details.master-details[open] summary{margin-bottom:14px;}
-details.mapping-details{margin-top:14px;}
-details.mapping-details summary{font-size:13px;font-weight:700;color:var(--navy);}
 
 /* ================= Relatórios PDF ================= */
 .report-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px;}
@@ -587,7 +576,7 @@ details.mapping-details summary{font-size:13px;font-weight:700;color:var(--navy)
         </div>
       </header>
 
-      <div class="upload-grid">
+      <div class="stack">
         <div class="card">
           <div class="upload-lock" id="upload-lock" hidden>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="5" y="10.5" width="14" height="10" rx="2"/><path d="M8 10.5V7.5a4 4 0 0 1 8 0v3" stroke-linecap="round"/></svg>
@@ -606,21 +595,8 @@ details.mapping-details summary{font-size:13px;font-weight:700;color:var(--navy)
           <input type="file" id="file-input" class="visually-hidden-input" accept=".xlsx,.xls,.xlsm,.csv">
           <div class="upload-status" id="upload-status" role="status"></div>
           <div class="publish-panel" id="publish-panel" hidden></div>
-          <div id="column-mapping-panel"></div>
           <div class="sample-link-row" id="sample-link-row" hidden>
             <button class="sample-link-btn" id="load-sample-btn" type="button">Não tem uma planilha em mãos? Carregar dados de exemplo</button>
-          </div>
-        </div>
-
-        <div class="card">
-          <h3 class="card-title">Como a planilha deve ser organizada</h3>
-          <div class="instructions-list">
-            <div class="instructions-item"><span class="instructions-num instructions-num--ok">✓</span><span>O padrão exportado pelo sistema fiscal já é 100% compatível: <span class="field-pill">Numero</span> <span class="field-pill">DataEmissao</span> <span class="field-pill">CNPJCPFEmitente</span> <span class="field-pill">RazaoSocialEmitente</span> <span class="field-pill">CnpjCpf</span> <span class="field-pill">RazaoSocial</span> <span class="field-pill">ValorTotal</span>. Pode enviar sem renomear nada.</span></div>
-            <div class="instructions-item"><span class="instructions-num">1</span><span>Uma linha por nota fiscal, com cabeçalho na primeira linha.</span></div>
-            <div class="instructions-item"><span class="instructions-num">2</span><span>Obrigatórias (o nome pode variar, o painel reconhece sozinho): <span class="field-pill">Numero</span> <span class="field-pill">CNPJ Remetente</span> <span class="field-pill">CNPJ Destinatario</span> <span class="field-pill">Data Emissao</span></span></div>
-            <div class="instructions-item"><span class="instructions-num">3</span><span>Opcionais, aproveitadas se existirem: <span class="field-pill">Serie</span> <span class="field-pill">Razao Social Emitente</span> <span class="field-pill">Razao Social</span> <span class="field-pill">Valor Total</span></span></div>
-            <div class="instructions-item"><span class="instructions-num">4</span><span>Os CNPJs das lojas e empresas já estão cadastrados no painel (base abaixo). Basta usar o mesmo CNPJ nas notas.</span></div>
-            <div class="instructions-item"><span class="instructions-num">5</span><span>Depois de enviar, confira as <b>colunas reconhecidas</b>: elas mostram qual coluna da planilha foi usada para cada campo.</span></div>
           </div>
         </div>
       </div>
@@ -635,6 +611,18 @@ details.mapping-details summary{font-size:13px;font-weight:700;color:var(--navy)
             </table>
           </div>
         </details>
+      </div>
+
+      <div class="card danger-card" id="danger-card" hidden>
+        <div class="report-card-head">
+          <span class="report-icon report-icon--red"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4.5 7h15M9.5 7V4.5h5V7M6.5 7l1 13h9l1-13" stroke-linecap="round" stroke-linejoin="round"/><path d="M10 11v5.5M14 11v5.5" stroke-linecap="round"/></svg></span>
+          <div>
+            <span class="card-eyebrow" style="color:var(--red-dark);">Somente administradores</span>
+            <h3 class="card-title">Limpar todos os dados</h3>
+            <p class="card-subtitle">Apaga, para todos, a base de notas (pendentes e resolvidas) e todas as observações. Os usuários e as permissões continuam. Não é possível desfazer.</p>
+            <button class="btn btn-danger" id="clear-open" type="button" style="margin-top:14px;">Limpar todos os dados</button>
+          </div>
+        </div>
       </div>
     </section>
 
@@ -1099,6 +1087,23 @@ details.mapping-details summary{font-size:13px;font-weight:700;color:var(--navy)
 </div>
 
 <div id="toast" role="status" aria-live="polite"><span class="dot"></span><span id="toast-text"></span></div>
+
+<dialog class="modal" id="clear-dialog" aria-labelledby="clear-title">
+  <form id="clear-form" novalidate>
+    <h3 class="card-title" id="clear-title" style="font-size:17px;color:var(--red-dark);">Limpar todos os dados?</h3>
+    <p class="card-subtitle">Isto apaga, para todos que usam o painel, a base de notas (pendentes e resolvidas) e todas as observações. Os usuários e as permissões continuam. Não é possível desfazer.</p>
+    <div class="field">
+      <label class="field-label" for="clear-confirm">Digite LIMPAR para confirmar</label>
+      <input class="input" id="clear-confirm" autocomplete="off" spellcheck="false">
+    </div>
+    <p class="form-error" id="clear-error" role="alert"></p>
+    <div class="modal-actions">
+      <span style="flex:1"></span>
+      <button class="btn btn-secondary" id="clear-cancel" type="button">Cancelar</button>
+      <button class="btn btn-danger" id="clear-submit" type="submit" disabled>Limpar tudo</button>
+    </div>
+  </form>
+</dialog>
 
 <dialog class="modal" id="login-dialog" aria-labelledby="login-title">
   <form id="login-form" novalidate>
@@ -1582,39 +1587,6 @@ function mergeUpload(existing, uploaded){
   return { list, stats };
 }
 
-const FIELD_LABELS = {
-  numeroNF: 'Número da Nota Fiscal',
-  serie: 'Série',
-  cnpjRemetente: 'CNPJ Remetente/Emitente',
-  nomeRemetente: 'Razão Social Remetente',
-  cnpjDestinatario: 'CNPJ Destinatário',
-  nomeDestinatario: 'Razão Social Destinatário',
-  dataEmissao: 'Data de Emissão',
-  valor: 'Valor Total',
-  chaveAcesso: 'Chave de Acesso'
-};
-const REQUIRED_FIELDS = ['numeroNF','cnpjRemetente','nomeRemetente','cnpjDestinatario','nomeDestinatario','dataEmissao','valor'];
-
-function renderColumnMapping(mapping, headerRow){
-  const panel = document.getElementById('column-mapping-panel');
-  if(!mapping || !headerRow){ panel.innerHTML=''; return; }
-  const items = REQUIRED_FIELDS.map(field=>{
-    const idx = mapping[field];
-    const found = idx>-1 && idx<headerRow.length;
-    const colName = found ? headerRow[idx] : null;
-    return (
-      '<div class="mapping-item '+(found?'m-ok':'m-missing')+'">'+
-        '<span class="m-field">'+escapeHtml(FIELD_LABELS[field])+'</span>'+
-        '<span class="m-col">'+(found ? escapeHtml(String(colName)) : '— não encontrada —')+'</span>'+
-      '</div>'
-    );
-  }).join('');
-  panel.innerHTML = (
-    '<details class="master-details mapping-details" open><summary>Colunas reconhecidas na sua planilha</summary>'+
-    '<div class="mapping-grid">'+items+'</div></details>'
-  );
-}
-
 function recomputeAtraso(){
   const today = todayMidnight();
   state.allInvoices.forEach(inv=>{
@@ -1643,9 +1615,11 @@ function computeCompanyAggregates(invoices){
   return Array.from(map.values()).map(r=>({...r, pct: r.total? r.emAtraso/r.total*100 : 0})).sort((a,b)=>b.total-a.total);
 }
 
-// Todas as empresas/CDs cadastrados (código >= 500) entram na lista, mesmo sem notas (total 0)
+// Todas as empresas/CDs cadastrados (código >= 500) entram na lista, mesmo sem notas (total 0).
+// Exceções: códigos que não são empresas remetentes (só aparecem se tiverem notas de fato).
+const EMPRESAS_SEM_ZERO = new Set(['601']);
 const MASTER_EMPRESAS = MASTER_STORES_RAW
-  .filter(([,codigo])=>classifyTipo(codigo)==='Empresa/CD')
+  .filter(([,codigo])=>classifyTipo(codigo)==='Empresa/CD' && !EMPRESAS_SEM_ZERO.has(codigo))
   .map(([,codigo,nome])=>codigo+' - '+nome);
 function withZeroCompanies(agg){
   const names = new Set(agg.map(c=>c.nome));
@@ -3032,6 +3006,7 @@ function applyModeUI(){
   if(!showUsers && state.activeTab === 'usuarios') showTab('dashboard');
   document.getElementById('setup-card').hidden = !(showUsers && state.setupDone === false && !state.role.admin);
   document.getElementById('users-admin').hidden = !state.role.admin;
+  document.getElementById('danger-card').hidden = !(cloud && state.role.admin);
   document.getElementById('upload-lock').hidden = !locked;
   document.getElementById('upload-lock-title').textContent = state.user ? 'Sua conta não pode enviar a planilha' : 'Entre para enviar a planilha';
   document.getElementById('upload-lock-login').hidden = !!state.user;
@@ -3095,7 +3070,6 @@ async function handleFile(file){
   }
   cancelPublish();
   setUploadStatus('info', 'Lendo arquivo "'+file.name+'"...');
-  document.getElementById('column-mapping-panel').innerHTML = '';
   let result;
   try{
     result = await readWorkbookFile(file);
@@ -3103,7 +3077,6 @@ async function handleFile(file){
     setUploadStatus('error', 'Erro ao processar o arquivo: '+err.message+' Se continuar, reexporte a planilha em .xlsx.');
     return;
   }
-  renderColumnMapping(result.mapping, result.headerRow);
   if(result.error){ setUploadStatus('error', result.error); return; }
   if(!result.data.length){
     setUploadStatus('error', 'Nenhuma nota fiscal válida foi encontrada nas linhas da planilha. Confira se as colunas de CNPJ não estão todas em branco.');
@@ -3389,7 +3362,6 @@ function loadSampleData(){
     [1353635,"","7705530000427","MIXTER ATAC.VAREJO","15610121000122","ATIBAIA SUPERMERCADOS","R$ 95,00"]
   ];
   const result = processWorkbookRows(dataRows, headerRow);
-  renderColumnMapping(result.mapping, result.headerRow);
   if(result.error){ setUploadStatus('error', result.error); return; }
   state.allInvoices = result.data;
   onDataLoaded('Dados de exemplo');
@@ -3593,6 +3565,42 @@ document.getElementById('logout-btn').addEventListener('click', ()=>{
   flushAllObs();
   window.Cloud.signOut().then(()=>showToast('Você saiu da conta'));
 });
+// Limpar todos os dados (só administradores) — pede para digitar LIMPAR
+const clearDialog = document.getElementById('clear-dialog');
+document.getElementById('clear-open').addEventListener('click', ()=>{
+  if(!state.role.admin || !window.Cloud) return;
+  document.getElementById('clear-confirm').value = '';
+  document.getElementById('clear-error').textContent = '';
+  document.getElementById('clear-submit').disabled = true;
+  clearDialog.showModal();
+  document.getElementById('clear-confirm').focus();
+});
+document.getElementById('clear-confirm').addEventListener('input', e=>{
+  document.getElementById('clear-submit').disabled = e.target.value.trim().toUpperCase() !== 'LIMPAR';
+});
+document.getElementById('clear-cancel').addEventListener('click', ()=>clearDialog.close());
+document.getElementById('clear-form').addEventListener('submit', async e=>{
+  e.preventDefault();
+  if(document.getElementById('clear-confirm').value.trim().toUpperCase() !== 'LIMPAR' || !state.role.admin) return;
+  const btn = document.getElementById('clear-submit');
+  btn.disabled = true; btn.textContent = 'Limpando...';
+  // descarta observações ainda não gravadas para não recriá-las depois da limpeza
+  obsRemoteTimers.forEach(t=>clearTimeout(t)); obsRemoteTimers.clear();
+  try{
+    const r = await window.Cloud.clearAll();
+    try{ localStorage.removeItem(OBS_STORAGE_KEY); }catch(err){}
+    clearDialog.close();
+    cancelPublish();
+    setUploadStatus('success', 'Dados apagados: '+fmtInt(r.notas)+' nota(s) e '+fmtInt(r.observacoes)+' observação(ões). O painel está vazio para todos; envie a base bruta para recomeçar.');
+    showToast('Todos os dados foram apagados');
+  }catch(err){
+    document.getElementById('clear-error').textContent = 'Não foi possível limpar: '+userErrorMsg(err);
+  }finally{
+    btn.textContent = 'Limpar tudo';
+    btn.disabled = document.getElementById('clear-confirm').value.trim().toUpperCase() !== 'LIMPAR';
+  }
+});
+
 document.getElementById('user-form').addEventListener('submit', submitNewUser);
 document.getElementById('users-tbody').addEventListener('click', e=>{
   const btn = e.target.closest('[data-user-action]');
@@ -3788,6 +3796,26 @@ window.Cloud = {
     b.set(doc(usersCol, email), { nome: me.displayName || email.split('@')[0], admin: true, criadoPor: email, criadoEm: serverTimestamp() });
     b.set(setupRef, { primeiroAdmin: email, em: serverTimestamp() });
     await b.commit();
+  },
+
+  // Apaga a base (meta + blocos) e todas as observações. Usuários e config/setup ficam.
+  async clearAll(){
+    if(!auth.currentUser) throw new Error('é preciso entrar com sua conta');
+    const chunkSnap = await getDocs(chunksCol);
+    let notas = 0;
+    chunkSnap.forEach(d => { try{ notas += JSON.parse(d.data().dados).length; }catch(e){} });
+    await deleteDoc(metaRef);   // primeiro o meta: o painel fica vazio para todos na hora
+    let observacoes = 0;
+    for(const col of [chunksCol, obsCol]){
+      const snap = await getDocs(col);
+      if(col === obsCol) observacoes = snap.size;
+      for(let i = 0; i < snap.docs.length; i += 450){
+        const b = writeBatch(db);
+        snap.docs.slice(i, i + 450).forEach(d => b.delete(d.ref));
+        await b.commit();
+      }
+    }
+    return { notas, observacoes };
   },
 
   saveObs(key, texto){
