@@ -1745,11 +1745,55 @@ function buildInvoice(r){
 
 function isoDate(d){ return d ? d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0') : ''; }
 
-// Formato compacto salvo no Firestore (um array por nota).
-function invoiceToRow(i){
-  return [i.numeroNF, isoDate(i.dataEmissao), i.cnpjRemetente, i.nomeRemetenteRaw, i.cnpjDestinatario, i.nomeDestinatarioRaw,
-          i.valor, i.resolvida?1:0, isoDate(i.resolvidaEm), isoDate(i.primeiraVez), isoDate(i.ultimaVez)];
+/* ---------- Formato de gravação no Firestore ----------
+   v2 (atual, compacto) — cada bloco é {"v":2,"d":[...],"r":[...]}:
+     d = lista de CNPJs do bloco: [cnpj] ou [cnpj, nome] (nome só se o CNPJ NÃO estiver na base cadastrada)
+     r = uma linha por nota: [nf, emissão, remetente, destinatário, valor, resolvidaEm, primeiraVez, ultimaVez]
+         datas = nº de dias desde 01/01/2000 (0 = sem data); remetente/destinatário = posição em "d";
+         zeros no fim da linha são omitidos.
+   v1 (antigo) — array de linhas com datas e nomes por extenso; continua sendo lido (migração). */
+const DIA0 = Date.UTC(2000,0,1);
+const toDia = d => d ? Math.round((Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) - DIA0) / 86400000) : 0;
+const fromDia = n => { if(!n) return null; const u = new Date(DIA0 + n*86400000); return new Date(u.getUTCFullYear(), u.getUTCMonth(), u.getUTCDate()); };
+
+function encodeChunks(invoices, maxChars){
+  const chunks = [];
+  let d = [], r = [], idx = new Map(), size = 20;
+  const fechar = ()=>{ if(r.length){ chunks.push(JSON.stringify({v:2, d, r})); } d = []; r = []; idx = new Map(); size = 20; };
+  const ref = (cnpj, nomeRaw)=>{
+    if(idx.has(cnpj)) return idx.get(cnpj);
+    const e = (cnpj && STORE_BY_CNPJ.has(cnpj)) || !nomeRaw ? [cnpj] : [cnpj, nomeRaw];
+    d.push(e); idx.set(cnpj, d.length-1); size += JSON.stringify(e).length + 1;
+    return d.length-1;
+  };
+  for(const i of invoices){
+    const estimativa = 120;   // margem para a linha + possíveis 2 entradas novas em "d"
+    if(r.length && size + estimativa > maxChars) fechar();
+    const nf = /^[1-9]\d{0,14}$/.test(i.numeroNF) ? Number(i.numeroNF) : i.numeroNF;
+    const row = [nf, toDia(i.dataEmissao), ref(i.cnpjRemetente, i.nomeRemetenteRaw), ref(i.cnpjDestinatario, i.nomeDestinatarioRaw),
+                 i.valor==null ? null : Math.round(i.valor*100)/100, i.resolvida ? toDia(i.resolvidaEm) || 1 : 0, toDia(i.primeiraVez), toDia(i.ultimaVez)];
+    while(row.length > 4 && row[row.length-1] === 0) row.pop();
+    r.push(row); size += JSON.stringify(row).length + 1;
+  }
+  fechar();
+  return chunks;
 }
+
+function decodeChunk(dados){
+  const p = JSON.parse(dados);
+  if(Array.isArray(p)) return p.map(rowToInvoice);          // formato antigo (v1)
+  return p.r.map(x=>{
+    const rem = p.d[x[2]] || [''], dest = p.d[x[3]] || [''];
+    return buildInvoice({
+      numeroNF: String(x[0]), dataEmissao: fromDia(x[1]),
+      cnpjRem: rem[0], nomeRem: rem[1] || '', cnpjDest: dest[0], nomeDest: dest[1] || '',
+      valor: x[4]==null ? null : x[4], resolvida: !!x[5], resolvidaEm: fromDia(x[5]),
+      primeiraVez: fromDia(x[6]), ultimaVez: fromDia(x[7])
+    });
+  });
+}
+function chunkCount(dados){ const p = JSON.parse(dados); return Array.isArray(p) ? p.length : p.r.length; }
+
 function rowToInvoice(r){
   return buildInvoice({
     numeroNF:r[0], dataEmissao:parseFlexibleDate(r[1]), cnpjRem:r[2], nomeRem:r[3], cnpjDest:r[4], nomeDest:r[5],
@@ -3236,7 +3280,7 @@ async function confirmPublish(){
   const btn = document.getElementById('publish-confirm');
   if(btn){ btn.disabled = true; btn.textContent = 'Publicando...'; }
   try{
-    await window.Cloud.publish(p.merge.list.map(invoiceToRow), { arquivo: p.fileName, stats: p.merge.stats });
+    await window.Cloud.publish(p.merge.list, { arquivo: p.fileName, stats: p.merge.stats });
     const s = p.merge.stats;
     cancelPublish();
     setUploadStatus('success', 'Base publicada: '+fmtInt(s.novas)+' nova(s), '+fmtInt(s.continuam)+' continuam pendentes, '+fmtInt(s.reabertas)+' reaberta(s) e '+fmtInt(s.resolvidas)+' resolvida(s). Todos que abrirem o painel já veem a atualização.');
@@ -3256,12 +3300,12 @@ async function confirmPublish(){
 const localObsBackup = loadObservacoes();
 let cloudFirstData = true;
 
-function cloudOnData(meta, rows){
+function cloudOnData(meta, invoices){
   const wasConnecting = state.mode === 'connecting';
   state.mode = 'cloud';
   state.cloudMeta = meta;
   // descarta registros sem nenhum CNPJ (lixo de uploads antigos); somem da base no próximo envio
-  state.allInvoices = rows.map(rowToInvoice).filter(i=>i.cnpjRemetente || i.cnpjDestinatario);
+  state.allInvoices = invoices.filter(i=>i.cnpjRemetente || i.cnpjDestinatario);
   onDataLoaded(meta.arquivo || 'Base online');
   applyModeUI();
   if(cloudFirstData && state.activeTab === 'upload' && state.allInvoices.length) showTab('dashboard');
@@ -3772,7 +3816,7 @@ applyModeUI();
    ========================================================================== */
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut, sendPasswordResetEmail, createUserWithEmailAndPassword } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
-import { getFirestore, doc, collection, query, where, getDocs, onSnapshot, runTransaction, setDoc, updateDoc, deleteDoc, writeBatch, serverTimestamp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+import { getFirestore, doc, collection, query, where, getDoc, getDocs, onSnapshot, runTransaction, setDoc, updateDoc, deleteDoc, writeBatch, serverTimestamp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 
 const firebaseConfig = {
   apiKey: "AIzaSyCqfgldB0kJF6eQTgdozggkOIJ0q72mDjE",
@@ -3788,12 +3832,16 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-const metaRef = doc(db, 'base', 'atual');
+// Base no formato compacto (v2): meta em base/v2 e blocos "v2-0", "v2-1"... em base_chunks (campo versao2).
+// A base antiga (base/atual + blocos "c0".. com campo versao) fica só para leitura até a 1ª publicação v2,
+// e serve de backup. Páginas antigas abertas não enxergam a base v2, então não conseguem sobrescrevê-la.
+const metaRef = doc(db, 'base', 'v2');
+const metaRefV1 = doc(db, 'base', 'atual');
 const chunksCol = collection(db, 'base_chunks');
 const obsCol = collection(db, 'observacoes');
 const CHUNK_MAX_CHARS = 700000;   // bem abaixo do limite de 1 MB por documento
 
-let loadedVersao = 0;
+let loadedVersao = 0;             // versão v2 carregada (0 = ainda não existe base v2)
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const obsDocId = key => encodeURIComponent(key);
 
@@ -3802,25 +3850,34 @@ function metaFromSnap(snap){
   return Object.assign({}, m, { atualizadoEm: m.atualizadoEm && m.atualizadoEm.toDate ? m.atualizadoEm.toDate() : null });
 }
 
-async function loadRows(meta, attempt = 0){
-  const snap = await getDocs(query(chunksCol, where('versao', '==', meta.versao)));
+// Lê os blocos de uma versão e devolve as notas já montadas (entende v1 e v2)
+async function loadInvoices(meta, campoVersao, attempt = 0){
+  const snap = await getDocs(query(chunksCol, where(campoVersao, '==', meta.versao)));
   const parts = snap.docs.map(d => d.data()).sort((a, b) => a.indice - b.indice);
   if(parts.length !== meta.chunks){
-    if(attempt < 5){ await sleep(700); return loadRows(meta, attempt + 1); }
+    if(attempt < 5){ await sleep(700); return loadInvoices(meta, campoVersao, attempt + 1); }
     throw new Error('a base no servidor está incompleta (versão '+meta.versao+')');
   }
-  return parts.flatMap(p => JSON.parse(p.dados));
+  return parts.flatMap(p => decodeChunk(p.dados));
 }
 
 // Base acumulada: recarrega sempre que alguém publica uma nova versão
 onSnapshot(metaRef, async snap => {
   try{
-    if(!snap.exists()){ loadedVersao = 0; cloudOnEmpty(); return; }
+    if(!snap.exists()){
+      // ainda não há base v2: mostra a base antiga (v1), se existir
+      loadedVersao = 0;
+      const v1 = await getDoc(metaRefV1);
+      if(!v1.exists()){ cloudOnEmpty(); return; }
+      const meta = metaFromSnap(v1);
+      cloudOnData(meta, await loadInvoices(meta, 'versao'));
+      return;
+    }
     const meta = metaFromSnap(snap);
     if(meta.versao === loadedVersao){ cloudOnMeta(meta); return; }
-    const rows = await loadRows(meta);
+    const invoices = await loadInvoices(meta, 'versao2');
     loadedVersao = meta.versao;
-    cloudOnData(meta, rows);
+    cloudOnData(meta, invoices);
   }catch(err){ cloudOnError(err); }
 }, err => cloudOnError(err));
 
@@ -3866,17 +3923,6 @@ function getAuthCadastro(){
   return authCadastro;
 }
 
-function splitChunks(rows){
-  const chunks = []; let cur = [], size = 2;
-  for(const r of rows){
-    const s = JSON.stringify(r);
-    if(cur.length && size + s.length + 1 > CHUNK_MAX_CHARS){ chunks.push('['+cur.join(',')+']'); cur = []; size = 2; }
-    cur.push(s); size += s.length + 1;
-  }
-  chunks.push('['+cur.join(',')+']');
-  return chunks;
-}
-
 window.Cloud = {
   signIn: (email, pass) => signInWithEmailAndPassword(auth, email, pass),
   signOut: () => signOut(auth),
@@ -3884,20 +3930,20 @@ window.Cloud = {
 
   // Grava a base mesclada inteira como uma nova versão, de forma atômica.
   // Se outra pessoa publicou depois que esta página carregou, aborta (CONFLITO).
-  async publish(rows, info){
+  async publish(invoices, info){
     if(!auth.currentUser) throw new Error('é preciso entrar com sua conta');
-    const chunks = splitChunks(rows);
-    if(chunks.length > 12) throw new Error('a base ficou grande demais para uma única publicação ('+rows.length+' notas)');
+    const chunks = encodeChunks(invoices, CHUNK_MAX_CHARS);   // formato compacto v2
+    if(chunks.length > 12) throw new Error('a base ficou grande demais para uma única publicação ('+invoices.length+' notas)');
     return runTransaction(db, async tx => {
       const snap = await tx.get(metaRef);
       const atual = snap.exists() ? snap.data() : null;
       const versaoAtual = atual ? atual.versao : 0;
       if(versaoAtual !== loadedVersao) throw new Error('CONFLITO');
       const versao = versaoAtual + 1;
-      chunks.forEach((dados, i) => tx.set(doc(chunksCol, 'c'+i), { versao, indice: i, dados }));
-      for(let i = chunks.length; i < (atual ? atual.chunks : 0); i++) tx.delete(doc(chunksCol, 'c'+i));
+      chunks.forEach((dados, i) => tx.set(doc(chunksCol, 'v2-'+i), { versao2: versao, indice: i, dados }));
+      for(let i = chunks.length; i < (atual ? atual.chunks : 0); i++) tx.delete(doc(chunksCol, 'v2-'+i));
       tx.set(metaRef, {
-        versao, chunks: chunks.length,
+        formato: 2, versao, chunks: chunks.length, total: invoices.length,
         atualizadoEm: serverTimestamp(),
         atualizadoPor: auth.currentUser.email,
         arquivo: info.arquivo || '',
@@ -3939,10 +3985,15 @@ window.Cloud = {
   // Apaga a base (meta + blocos) e todas as observações. Usuários e config/setup ficam.
   async clearAll(){
     if(!auth.currentUser) throw new Error('é preciso entrar com sua conta');
+    // conta as notas da base que está em uso (v2 se existir; senão a antiga)
+    const v2 = await getDoc(metaRef);
+    const campo = v2.exists() ? 'versao2' : 'versao';
+    const metaUso = v2.exists() ? v2.data() : ((await getDoc(metaRefV1)).data() || {});
     const chunkSnap = await getDocs(chunksCol);
     let notas = 0;
-    chunkSnap.forEach(d => { try{ notas += JSON.parse(d.data().dados).length; }catch(e){} });
-    await deleteDoc(metaRef);   // primeiro o meta: o painel fica vazio para todos na hora
+    chunkSnap.forEach(d => { const x = d.data(); if(x[campo] === metaUso.versao){ try{ notas += chunkCount(x.dados); }catch(e){} } });
+    await deleteDoc(metaRef);     // primeiro os metas: o painel fica vazio para todos na hora
+    await deleteDoc(metaRefV1);
     let observacoes = 0;
     for(const col of [chunksCol, obsCol]){
       const snap = await getDocs(col);
