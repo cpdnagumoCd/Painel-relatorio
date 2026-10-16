@@ -29,6 +29,10 @@ Notas resolvidas não contam como atraso. Elas aparecem na aba **Notas Fiscais**
 pelo filtro *Status → Resolvidas*. As observações ficam ligadas à nota e são
 compartilhadas com todos em tempo real.
 
+Para economizar espaço, a nota resolvida há mais de **30 dias** sai do histórico
+(junto com a observação dela) na próxima atualização da base. Notas pendentes nunca
+saem, por mais antigas que sejam.
+
 > Envie sempre a base bruta **completa** do dia. Uma planilha parcial faria as notas
 > que ficaram de fora serem marcadas como resolvidas. O resumo avisa quando muitas notas
 > vão ser resolvidas de uma vez.
