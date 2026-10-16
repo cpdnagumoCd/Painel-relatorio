@@ -367,10 +367,7 @@ table.data-table tbody tr:last-child td{border-bottom:none;}
 table.data-table td.num,table.data-table th.num{text-align:right;}
 .mono{font-variant-numeric:tabular-nums;color:var(--ink-soft);}
 .cell-strong{font-weight:700;color:var(--heading);}
-#notas-table{min-width:1090px;}
-.legal{font-size:12px;font-weight:700;color:var(--ink-faint);white-space:nowrap;}
-.legal.is-near{color:var(--sev-recente-ink);}
-.legal.is-due{color:var(--sev-alto-ink);}
+#notas-table{min-width:1000px;}
 .table-foot{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-top:10px;font-size:12px;color:var(--ink-soft);font-weight:600;}
 .text-red{color:var(--red);}
 .bold{font-weight:800;}
@@ -529,58 +526,6 @@ details.master-details[open] summary{margin-bottom:14px;}
 .multi-opt input{accent-color:var(--teal-dark);width:15px;height:15px;margin:0;flex:none;}
 .multi-opt span{flex:1;white-space:nowrap;}
 .multi-opt small{font-size:11px;color:var(--ink-faint);font-weight:700;font-variant-numeric:tabular-nums;}
-
-/* ================= Melhorias: movimento, evolução, tempo de confirmação ================= */
-.update-strip{
-  display:flex;align-items:center;justify-content:space-between;gap:10px 18px;flex-wrap:wrap;
-  background:var(--card);border:1px solid var(--line);border-radius:var(--radius-md);padding:10px 16px;box-shadow:var(--shadow-sm);
-}
-.up-when{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--ink-soft);font-weight:600;}
-.up-when svg{width:16px;height:16px;color:var(--accent);flex:none;}
-.up-when b{color:var(--heading);}
-.up-chips{display:flex;gap:8px;flex-wrap:wrap;}
-.up-chip{font-size:12px;font-weight:700;padding:4px 10px;border-radius:99px;background:var(--bg);color:var(--ink-soft);white-space:nowrap;}
-.up-chip b{font-size:13px;}
-.up-new{background:var(--sev-prazo-tint);color:var(--sev-prazo-ink);}
-.up-res{background:var(--teal-tint);color:var(--teal-dark);}
-.up-reo{background:var(--sev-recente-tint);color:var(--sev-recente-ink);}
-
-.seg{display:inline-flex;background:var(--bg);border:1px solid var(--line);border-radius:99px;padding:3px;gap:2px;}
-.seg button{border:none;background:transparent;color:var(--ink-soft);font-size:12px;font-weight:700;padding:5px 11px;border-radius:99px;}
-.seg button[aria-pressed="true"]{background:var(--card);color:var(--heading);box-shadow:var(--shadow-sm);}
-.q-legal{display:inline-block;margin-left:8px;font-size:10.5px;font-weight:800;color:var(--sev-alto-ink);background:var(--sev-alto-tint);border-radius:6px;padding:2px 6px;vertical-align:1px;}
-.q-valor{color:var(--heading);}
-
-.pill--good{background:var(--teal-tint);color:var(--teal-dark);border-color:transparent;}
-.pill--bad{background:var(--sev-alto-tint);color:var(--sev-alto-ink);border-color:transparent;}
-.evo-chart{display:flex;align-items:flex-end;gap:8px;height:210px;overflow-x:auto;padding-top:4px;}
-.evo-col{flex:1 0 34px;min-width:34px;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;}
-.evo-count{font-size:11.5px;font-weight:800;color:var(--heading);margin-bottom:3px;font-variant-numeric:tabular-nums;}
-.evo-stack{width:62%;max-width:30px;display:flex;flex-direction:column-reverse;border-radius:5px 5px 2px 2px;overflow:hidden;}
-.evo-stack span{display:block;width:100%;background:var(--sev);}
-.evo-zero{height:2px;background:var(--line) !important;}
-.evo-label{font-size:10.5px;font-weight:700;color:var(--ink-soft);margin-top:6px;white-space:nowrap;}
-.evo-col.is-today .evo-stack{opacity:.55;outline:1.5px dashed var(--ink-faint);outline-offset:2px;}
-.evo-col.is-today .evo-label{color:var(--accent);font-weight:800;}
-
-.conf-kpis{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-bottom:12px;}
-.conf-kpis div{background:var(--bg);border-radius:10px;padding:10px 12px;display:flex;flex-direction:column;gap:2px;}
-.conf-kpis b{font-size:24px;font-weight:800;color:var(--heading);font-variant-numeric:tabular-nums;line-height:1.1;}
-.conf-kpis span{font-size:11.5px;color:var(--ink-soft);font-weight:600;}
-.conf-kpis .is-good b{color:var(--teal-dark);}
-.conf-kpis .is-mid b{color:var(--sev-recente-ink);}
-.conf-kpis .is-bad b{color:var(--sev-alto-ink);}
-.conf-bar{display:flex;height:8px;border-radius:99px;overflow:hidden;background:var(--bg);}
-.conf-bar span{display:block;height:100%;background:var(--sev);}
-.conf-note{font-size:11.5px;color:var(--ink-faint);margin:8px 0 12px;}
-.conf-sub{font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-soft);margin-bottom:6px;}
-.conf-list{display:flex;flex-direction:column;}
-.conf-row{display:grid;grid-template-columns:minmax(0,1fr) auto 70px;gap:10px;align-items:center;padding:7px 8px;border-radius:8px;font-size:12.5px;cursor:pointer;}
-.conf-row:hover{background:var(--bg);}
-.conf-row span:first-child{font-weight:700;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.conf-n{color:var(--ink-faint);font-size:11.5px;font-weight:600;}
-.conf-row b{text-align:right;color:var(--heading);font-variant-numeric:tabular-nums;}
-.conf-row b.is-bad{color:var(--sev-alto-ink);}
 
 /* ================= Modo escuro =================
    Ativado por data-theme="dark" no <html> (botão "Aparência" no menu; "Sistema"
@@ -892,7 +837,6 @@ details.master-details[open] summary{margin-bottom:14px;}
       </div>
 
       <div class="data-dependent stack" hidden id="dashboard-content">
-        <div class="update-strip" id="update-strip" hidden></div>
         <!-- Avaliação automática + indicadores -->
         <div class="dash-hero">
           <div class="assess" id="dash-assess"></div>
@@ -950,37 +894,11 @@ details.master-details[open] summary{margin-bottom:14px;}
                 <h3 class="card-title">Fila de prioridade</h3>
                 <p class="card-subtitle">Notas em atraso mais antigas — comece por aqui.</p>
               </div>
-              <div class="seg" id="queue-sort" role="group" aria-label="Ordenar a fila">
-                <button type="button" data-queue="antigas" aria-pressed="true">Mais antigas</button>
-                <button type="button" data-queue="valor" aria-pressed="false">Maior valor</button>
-              </div>
+              <button class="link-btn" type="button" data-notas-status="atraso">Ver todas →</button>
             </div>
             <div class="queue" id="priority-queue"></div>
           </div>
         </div>
-        <div class="grid-2 dash-row-b">
-          <div class="card">
-            <div class="card-head">
-              <div>
-                <h3 class="card-title">Evolução dos atrasos</h3>
-                <p class="card-subtitle">Notas em atraso em cada atualização da base, por faixa. Mostra se a fila está diminuindo ou crescendo.</p>
-              </div>
-              <span class="pill" id="evo-trend"></span>
-            </div>
-            <div class="evo-chart" id="evo-chart"></div>
-          </div>
-
-          <div class="card">
-            <div class="card-head">
-              <div>
-                <h3 class="card-title">Tempo de confirmação</h3>
-                <p class="card-subtitle">Dias entre a emissão e a nota sair da base bruta (operação confirmada), medido pelas atualizações.</p>
-              </div>
-            </div>
-            <div id="conf-panel"></div>
-          </div>
-        </div>
-
 
         <div class="grid-2 dash-row-b">
           <div class="card">
@@ -1016,10 +934,6 @@ details.master-details[open] summary{margin-bottom:14px;}
           <p class="page-desc">Mais antigas primeiro. Use a coluna <b>Observação</b> para sinalizar a situação de cada nota: o texto é salvo automaticamente neste navegador e sai nos relatórios em PDF.</p>
         </div>
         <div class="page-actions data-dependent" hidden>
-          <button class="btn btn-secondary" id="notas-export-xlsx-btn" type="button" title="Baixa a lista filtrada em Excel, com observações">
-            <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="3.5" width="16" height="17" rx="2"/><path d="M8.5 8.5l7 7M15.5 8.5l-7 7" stroke-linecap="round"/></svg>
-            Exportar Excel
-          </button>
           <button class="btn btn-primary" id="notas-export-pdf-btn" type="button">
             <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12m0 0-4-4m4 4 4-4" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" stroke-linecap="round"/></svg>
             Gerar PDF desta lista
@@ -1067,7 +981,6 @@ details.master-details[open] summary{margin-bottom:14px;}
                 <option value="alto">Atraso alto · 8 a 20 dias</option>
                 <option value="recente">Atraso recente · 1 a 7 dias</option>
                 <option value="prazo">No prazo</option>
-                <option value="legal">Prazo legal em até 30 dias (ou vencido)</option>
                 <option value="semdata">Sem data de emissão</option>
                 <option value="resolvida">Resolvidas (saíram da base)</option>
               </select>
@@ -1107,7 +1020,6 @@ details.master-details[open] summary{margin-bottom:14px;}
                   <th data-sort="diasDesdeEmissao" class="num">Dias<span class="sort-arrow">▾</span></th>
                   <th data-sort="emAtraso">Status<span class="sort-arrow">▾</span></th>
                   <th data-sort="diasEmAtraso" class="num">Dias em atraso<span class="sort-arrow">▾</span></th>
-                  <th data-sort="prazoLegalRest" class="num" title="Prazo legal de 90 dias para manifestação do destinatário (Ajuste SINIEF 14/2026). Depois dele a operação é considerada confirmada tacitamente.">Prazo legal<span class="sort-arrow">▾</span></th>
                   <th>Observação</th>
                 </tr>
               </thead>
@@ -1162,7 +1074,6 @@ details.master-details[open] summary{margin-bottom:14px;}
                   <th data-sort="pct" class="num">% atraso<span class="sort-arrow">▾</span></th>
                   <th data-sort="mediaDiasAtraso" class="num">Média dias<span class="sort-arrow">▾</span></th>
                   <th data-sort="maxDias">Nota mais antiga<span class="sort-arrow">▾</span></th>
-                  <th data-sort="tempoConf" class="num" title="Média de dias entre a emissão e a nota sair da base bruta (confirmada)">Tempo p/ confirmar<span class="sort-arrow">▾</span></th>
                   <th>PDF</th>
                 </tr>
               </thead>
@@ -1667,15 +1578,6 @@ function showToast(msg){
    3. ESTADO DA APLICAÇÃO
    ========================================================================== */
 const OBS_STORAGE_KEY = 'nagumo.notasFiscais.observacoes.v1';
-// Prazo legal para a manifestação do destinatário: 90 dias da emissão (Ajuste SINIEF 14/2026,
-// vigente desde 01/06/2026). Sem manifestação nesse prazo, a SEFAZ confirma a operação tacitamente.
-const PRAZO_LEGAL_DIAS = 90;
-function prazoLegalHtml(inv){
-  if(inv.prazoLegalRest==null) return '<span class="legal">—</span>';
-  const r = inv.prazoLegalRest;
-  if(r < 0) return '<span class="legal is-due" title="Prazo legal vencido há '+(-r)+' dia(s)">vencido</span>';
-  return '<span class="legal'+(r<=30?' is-near':'')+'" title="Faltam '+r+' dia(s) para o prazo legal de '+PRAZO_LEGAL_DIAS+' dias">'+(r===0?'vence hoje':'em '+r+'d')+'</span>';
-}
 const state = {
   allInvoices: [],    // base completa (pendentes + resolvidas)
   invoices: [],       // somente as pendentes — é o que alimenta dashboard, rankings e PDFs
@@ -1687,7 +1589,6 @@ const state = {
   cloudMeta: null,    // informações da última publicação (data, autor, arquivo, contagens)
   pendingPublish: null,
   dashMonth: 'all',   // filtro de mês de emissão do dashboard ('all' ou 'AAAA-MM')
-  queueSort: 'antigas', // fila de prioridade: 'antigas' ou 'valor'
   dash: { invoices:[], resolvidas:[], companyAgg:[], storeAgg:[], invalidDateCount:0 },
   companyAgg: [],
   storeAgg: [],
@@ -1822,7 +1723,6 @@ function buildInvoice(r){
     diasDesdeEmissao: null,
     emAtraso: false,
     diasEmAtraso: 0,
-    prazoLegalRest: null,
     valor: (r.valor==null || r.valor==='') ? null : Number(r.valor),
     resolvida: !!r.resolvida,          // saiu da base bruta (operação confirmada)
     resolvidaEm: r.resolvidaEm || null,
@@ -1888,8 +1788,6 @@ function recomputeAtraso(){
       // nota resolvida não conta como atraso
       inv.emAtraso = !inv.resolvida && inv.diasDesdeEmissao > state.prazoLimite;
       inv.diasEmAtraso = inv.emAtraso ? inv.diasDesdeEmissao - state.prazoLimite : 0;
-      // dias que faltam para o prazo legal de manifestação (90 dias da emissão; depois a SEFAZ confirma tacitamente)
-      inv.prazoLegalRest = inv.resolvida ? null : PRAZO_LEGAL_DIAS - inv.diasDesdeEmissao;
     }
   });
 }
@@ -2140,21 +2038,15 @@ function renderLojasRanking(){
 
 function renderQueue(){
   const el = document.getElementById('priority-queue');
-  // "Mais antigas" (padrão) ou "Maior valor": as duas formas usuais de priorizar pendências
-  const porValor = state.queueSort === 'valor';
-  document.getElementById('queue-sort').hidden = !state.hasValor;
-  document.querySelectorAll('#queue-sort [data-queue]').forEach(b=>b.setAttribute('aria-pressed', String(b.dataset.queue === (porValor?'valor':'antigas'))));
-  const top = state.dash.av.atras.slice().sort(porValor ? (a,b)=>(b.valor||0)-(a.valor||0) || byMostOverdue(a,b) : byMostOverdue).slice(0,15);
+  const top = state.dash.av.atras.slice().sort(byMostOverdue).slice(0,15);
   if(!top.length){ el.innerHTML = '<p class="empty-note">Nenhuma nota em atraso. 🎉</p>'; return; }
   el.innerHTML = top.map(i=>{
     const obs = getObs(i).trim();
-    const legal = i.prazoLegalRest!=null && i.prazoLegalRest <= 30
-      ? '<span class="q-legal">'+(i.prazoLegalRest<0 ? 'prazo legal vencido' : 'prazo legal em '+i.prazoLegalRest+'d')+'</span>' : '';
     return '<div class="q-item sev--'+pdfGrupo(i)+'">'+
       '<div class="q-days"><b>'+fmtInt(i.diasEmAtraso)+'</b><span>'+(i.diasEmAtraso===1?'dia':'dias')+'</span></div>'+
       '<div class="q-body">'+
-        '<div class="q-title">NF '+escapeHtml(i.numeroNF)+' · '+escapeHtml(i.nomeDestinatario)+legal+'</div>'+
-        '<div class="q-meta">'+escapeHtml(i.nomeRemetente)+' · emitida em '+i.dataEmissaoFmt+(i.valor!=null?' · <b class="q-valor">'+fmtMoney(i.valor)+'</b>':'')+'</div>'+
+        '<div class="q-title">NF '+escapeHtml(i.numeroNF)+' · '+escapeHtml(i.nomeDestinatario)+'</div>'+
+        '<div class="q-meta">'+escapeHtml(i.nomeRemetente)+' · emitida em '+i.dataEmissaoFmt+(i.valor!=null?' · '+fmtMoney(i.valor):'')+'</div>'+
         (obs ? '<div class="q-obs"><b>Obs.:</b> '+escapeHtml(obs)+'</div>' : '<span class="q-noobs">Sem observação</span>')+
       '</div></div>';
   }).join('');
@@ -2196,123 +2088,13 @@ function renderCompanies(){
   }).join('');
 }
 
-/* ---------- Movimento da última atualização (dados da publicação no Firebase) ---------- */
-function renderUpdateStrip(){
-  const el = document.getElementById('update-strip');
-  const m = state.cloudMeta;
-  if(state.mode !== 'cloud' || !m || !m.stats){ el.hidden = true; return; }
-  const s = m.stats;
-  const chip = (cls, n, txt)=> '<span class="up-chip '+cls+'"><b>'+fmtInt(n||0)+'</b> '+txt+'</span>';
-  el.innerHTML =
-    '<div class="up-when"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M20 12a8 8 0 1 1-2.34-5.66M20 4v4h-4" stroke-linecap="round" stroke-linejoin="round"/></svg>'+
-      '<span>Última atualização <b>'+fmtDateTimeBR(m.atualizadoEm)+'</b>'+(m.atualizadoPor?' por '+escapeHtml(m.atualizadoPor):'')+'</span></div>'+
-    '<div class="up-chips">'+
-      chip('up-new', s.novas, (s.novas===1?'nova':'novas'))+
-      chip('up-res', s.resolvidas, (s.resolvidas===1?'resolvida':'resolvidas'))+
-      (s.reabertas ? chip('up-reo', s.reabertas, (s.reabertas===1?'reaberta':'reabertas')) : '')+
-      chip('up-cont', s.continuam, 'continuam pendentes')+
-    '</div>';
-  el.hidden = false;
-}
-
-/* ---------- Evolução dos atrasos ----------
-   Reconstrói, para cada data de atualização, quais notas estavam na base
-   (entraram até aquela data e ainda não tinham saído) e quantas estavam em atraso. */
-function computeEvolucao(){
-  const m = state.dashMonth;
-  const lista = state.allInvoices.filter(i=>i.primeiraVez && (m==='all' || monthKey(i.dataEmissao)===m));
-  const datas = new Set();
-  lista.forEach(i=>{ datas.add(isoDate(i.primeiraVez)); if(i.resolvidaEm) datas.add(isoDate(i.resolvidaEm)); });
-  // ponto "hoje": a situação atual, mesmo sem upload no dia (os dias de atraso continuam correndo)
-  const hoje = isoDate(todayMidnight());
-  const temHoje = datas.has(hoje);
-  if(lista.length) datas.add(hoje);
-  return [...datas].sort().slice(-20).map(ds=>{
-    const D = parseFlexibleDate(ds);
-    const c = { data:D, critico:0, alto:0, recente:0, pendentes:0, ehHoje: ds===hoje && !temHoje };
-    lista.forEach(i=>{
-      if(i.primeiraVez > D) return;                       // ainda não tinha entrado
-      if(i.resolvidaEm && i.resolvidaEm <= D) return;     // já tinha saído
-      c.pendentes++;
-      if(!i.dataEmissao) return;
-      const atraso = daysBetween(i.dataEmissao, D) - state.prazoLimite;
-      if(atraso > 0) c[atraso>=21 ? 'critico' : atraso>=8 ? 'alto' : 'recente']++;
-    });
-    c.atraso = c.critico + c.alto + c.recente;
-    return c;
-  });
-}
-
-function renderEvolucao(){
-  const el = document.getElementById('evo-chart');
-  const trend = document.getElementById('evo-trend');
-  const pts = computeEvolucao();
-  if(pts.length < 2){
-    trend.textContent = '';
-    el.innerHTML = '<p class="empty-note">A evolução aparece a partir da 2ª atualização da base'+(state.mode!=='cloud'?' (só na base online)':'')+'.</p>';
-    return;
-  }
-  const a = pts[pts.length-2].atraso, b = pts[pts.length-1].atraso;
-  trend.className = 'pill '+(b<a?'pill--good':b>a?'pill--bad':'');
-  const ref = pts[pts.length-1].ehHoje ? 'que na última atualização' : 'que na atualização anterior';
-  trend.textContent = b<a ? '▼ '+fmtInt(a-b)+' a menos '+ref : b>a ? '▲ '+fmtInt(b-a)+' a mais '+ref : 'Igual '+(pts[pts.length-1].ehHoje?'à última atualização':'à atualização anterior');
-  const max = Math.max(1, ...pts.map(p=>p.atraso));
-  el.innerHTML = pts.map(p=>{
-    const segs = ['recente','alto','critico'].map(id=> p[id] ? '<span class="sev--'+id+'" style="height:'+(p[id]/max*150).toFixed(1)+'px"></span>' : '').join('');
-    return '<div class="evo-col'+(p.ehHoje?' is-today':'')+'" title="'+(p.ehHoje?'Hoje (sem nova atualização): ':formatDateBR(p.data)+': ')+fmtInt(p.atraso)+' em atraso ('+fmtInt(p.critico)+' crítico, '+fmtInt(p.alto)+' alto, '+fmtInt(p.recente)+' recente) · '+fmtInt(p.pendentes)+' pendentes">'+
-      '<span class="evo-count">'+fmtInt(p.atraso)+'</span>'+
-      '<span class="evo-stack">'+(segs || '<span class="evo-zero"></span>')+'</span>'+
-      '<span class="evo-label">'+(p.ehHoje ? 'hoje' : formatDateBR(p.data).slice(0,5))+'</span>'+
-    '</div>';
-  }).join('');
-}
-
-/* ---------- Tempo de confirmação (notas que já saíram da base) ---------- */
-function computeConfirmacao(resolvidas){
-  const itens = resolvidas.filter(i=>i.dataEmissao && i.resolvidaEm)
-    .map(i=>({ i, dias: Math.max(0, daysBetween(i.dataEmissao, i.resolvidaEm)) }));
-  if(!itens.length) return null;
-  const ds = itens.map(x=>x.dias).sort((a,b)=>a-b);
-  const media = ds.reduce((s,d)=>s+d,0)/ds.length;
-  const mediana = ds.length%2 ? ds[(ds.length-1)/2] : (ds[ds.length/2-1]+ds[ds.length/2])/2;
-  const noPrazo = itens.filter(x=>x.dias <= state.prazoLimite).length;
-  const porLoja = new Map();
-  itens.forEach(x=>{ const r = porLoja.get(x.i.nomeDestinatario) || {nome:x.i.nomeDestinatario, n:0, soma:0}; r.n++; r.soma += x.dias; porLoja.set(r.nome, r); });
-  const lojas = [...porLoja.values()].map(r=>Object.assign(r, {media:r.soma/r.n}));
-  return { n:itens.length, media, mediana, noPrazo, pctNoPrazo: noPrazo/itens.length*100, lojas };
-}
-
-function renderConfirmacao(){
-  const el = document.getElementById('conf-panel');
-  const c = computeConfirmacao(state.dash.resolvidas);
-  if(!c){ el.innerHTML = '<p class="empty-note">Ainda não há notas resolvidas'+(state.dashMonth!=='all'?' neste mês':'')+'. O tempo aparece quando as notas começarem a sair da base bruta.</p>'; return; }
-  const lentas = c.lojas.filter(l=>l.n>=2).sort((a,b)=>b.media-a.media).slice(0,5);
-  el.innerHTML =
-    '<div class="conf-kpis">'+
-      '<div><b>'+fmtDec(c.media,1)+'</b><span>dias em média</span></div>'+
-      '<div><b>'+fmtDec(c.mediana,0)+'</b><span>dias (mediana)</span></div>'+
-      '<div class="'+(c.pctNoPrazo>=80?'is-good':c.pctNoPrazo>=50?'is-mid':'is-bad')+'"><b>'+fmtDec(c.pctNoPrazo, Number.isInteger(c.pctNoPrazo)?0:1)+'%</b><span>confirmadas em até '+state.prazoLimite+' dias</span></div>'+
-    '</div>'+
-    '<div class="conf-bar" title="'+fmtInt(c.noPrazo)+' de '+fmtInt(c.n)+' confirmadas dentro do prazo">'+
-      '<span class="sev--prazo" style="width:'+c.pctNoPrazo.toFixed(1)+'%"></span><span class="sev--alto" style="width:'+(100-c.pctNoPrazo).toFixed(1)+'%"></span></div>'+
-    '<p class="conf-note">Base: '+fmtInt(c.n)+' nota(s) resolvida(s). Como a saída é percebida no upload, o tempo pode ter até 1 dia a mais que o real.</p>'+
-    (lentas.length ?
-      '<div class="conf-sub">Lojas que mais demoram para confirmar</div>'+
-      '<div class="conf-list">'+lentas.map(l=>
-        '<div class="conf-row" data-loja-res="'+escapeHtml(l.nome)+'" title="Ver as notas de '+escapeHtml(l.nome)+'"><span>'+escapeHtml(l.nome)+'</span><span class="conf-n">'+fmtInt(l.n)+' notas</span><b class="'+(l.media>state.prazoLimite?'is-bad':'')+'">'+fmtDec(l.media,1)+' dias</b></div>'
-      ).join('')+'</div>' : '');
-}
-
 function renderDashboardTab(){
   state.dash.av = pdfAvaliacao(state.dash.invoices, {umaLoja:false});
   renderKPIs();
   renderAssess();
   renderSeverity();
-  renderUpdateStrip();
   renderLojasRanking();
   renderQueue();
-  renderEvolucao();
-  renderConfirmacao();
   renderDayChart();
   renderCompanies();
 }
@@ -2363,7 +2145,6 @@ function getFilteredNotas(){
   else if(f.status==='prazo') list = list.filter(i=>!i.emAtraso && i.dataEmissao);
   else if(f.status==='semdata') list = list.filter(i=>!i.dataEmissao);
   else if(['critico','alto','recente'].includes(f.status)) list = list.filter(i=>pdfGrupo(i)===f.status);
-  else if(f.status==='legal') list = list.filter(i=>i.prazoLegalRest!=null && i.prazoLegalRest <= 30);
   if(f.mes && f.mes!=='all') list = list.filter(i=>monthKey(i.dataEmissao)===f.mes);
   if(f.obs==='com') list = list.filter(i=>getObs(i).trim());
   else if(f.obs==='sem') list = list.filter(i=>!getObs(i).trim());
@@ -2424,7 +2205,6 @@ function notaRowHtml(inv){
       '<td class="mono num">'+(inv.diasDesdeEmissao==null?'—':inv.diasDesdeEmissao)+'</td>'+
       '<td>'+statusBadgeHtml(inv)+'</td>'+
       '<td class="mono num '+(inv.emAtraso?'text-red bold':'')+'">'+(inv.emAtraso? inv.diasEmAtraso : '—')+'</td>'+
-      '<td class="num">'+prazoLegalHtml(inv)+'</td>'+
       '<td><textarea class="obs-input'+(obs.trim()?' has-obs':'')+'" rows="'+obsRowsFor(obs)+'" maxlength="500" data-obs-key="'+escapeHtml(obsKeyFor(inv))+'" '+
         (canEditObs() ? 'placeholder="Adicionar observação..."' : 'readonly placeholder="Entre para escrever"')+
         ' aria-label="Observação da nota '+escapeHtml(inv.numeroNF)+'">'+escapeHtml(obs)+'</textarea></td>'+
@@ -2481,7 +2261,7 @@ function renderNotasTab(){
   state.notasShown = 0;
 
   const tbody = document.getElementById('notas-tbody');
-  tbody.innerHTML = state.notasView.length ? '' : '<tr><td colspan="9" class="empty-note">Nenhuma nota encontrada com os filtros atuais.</td></tr>';
+  tbody.innerHTML = state.notasView.length ? '' : '<tr><td colspan="8" class="empty-note">Nenhuma nota encontrada com os filtros atuais.</td></tr>';
   document.getElementById('notas-scroll').scrollTop = 0;
   appendNotasRows();
 
@@ -2505,11 +2285,7 @@ function renderLojasTab(){
   const lojas = q ? state.storeAgg.filter(s=>
     s.nome.toLowerCase().includes(q) || (qDigits && normalizeDigits(s.cnpj).includes(qDigits))
   ) : state.storeAgg;
-  // tempo médio para confirmar (notas da loja que já saíram da base)
-  const conf = computeConfirmacao(state.allInvoices.filter(i=>i.resolvida));
-  const confMap = new Map(conf ? conf.lojas.map(l=>[l.nome, l]) : []);
-  const linhas = lojas.map(s=>{ const c = confMap.get(s.nome); return Object.assign({}, s, { tempoConf: c ? c.media : null, confirmadas: c ? c.n : 0 }); });
-  const sortedLojas = sortGeneric(linhas, state.lojasSort.col, state.lojasSort.dir);
+  const sortedLojas = sortGeneric(lojas, state.lojasSort.col, state.lojasSort.dir);
   const tbody = document.getElementById('lojas-tbody');
   tbody.innerHTML = sortedLojas.map(s=>(
     '<tr>'+
@@ -2520,10 +2296,9 @@ function renderLojasTab(){
       '<td class="mono num">'+fmtDec(s.pct,1)+'%</td>'+
       '<td class="mono num">'+(s.emAtraso? fmtDec(s.mediaDiasAtraso,1) : '—')+'</td>'+
       '<td class="mono">'+(s.maxData? formatDateBR(s.maxData)+' ('+s.maxDias+'d)' : '—')+'</td>'+
-      '<td class="mono num" title="'+(s.confirmadas ? fmtInt(s.confirmadas)+' nota(s) confirmada(s)' : 'Nenhuma nota confirmada ainda')+'">'+(s.tempoConf!=null ? '<span class="'+(s.tempoConf>state.prazoLimite?'text-red bold':'')+'">'+fmtDec(s.tempoConf,1)+'d</span>' : '—')+'</td>'+
       '<td><button class="btn-mini" type="button" data-action="pdf-store" data-store="'+escapeHtml(s.nome)+'">Gerar PDF</button></td>'+
     '</tr>'
-  )).join('') || '<tr><td colspan="9" class="empty-note">Nenhuma loja encontrada.</td></tr>';
+  )).join('') || '<tr><td colspan="8" class="empty-note">Nenhuma loja encontrada.</td></tr>';
   document.getElementById('lojas-count').textContent = q
     ? fmtInt(sortedLojas.length)+' de '+fmtInt(state.storeAgg.length)+' loja(s)'
     : fmtInt(state.storeAgg.length)+' loja(s) · '+fmtInt(state.storeAgg.filter(s=>s.emAtraso>0).length)+' com notas em atraso';
@@ -2700,11 +2475,6 @@ function pdfAvaliacao(list, opts){
       t[0]+' — '+fmtInt(t[1])+' nota(s), '+fmtDec(t[1]/atras.length*100,0)+'% dos atrasos.');
   }
   if(g.critico.length) frases.push(fmtInt(g.critico.length)+' nota(s) passaram de 21 dias de atraso e pedem ação imediata.');
-  // Prazo legal de manifestação (Ajuste SINIEF 14/2026: 90 dias; depois disso, confirmação tácita pela SEFAZ)
-  const legalVencido = pend.filter(i=>i.dataEmissao && i.diasDesdeEmissao > PRAZO_LEGAL_DIAS).length;
-  const legalPerto = pend.filter(i=>i.dataEmissao && i.diasDesdeEmissao <= PRAZO_LEGAL_DIAS && PRAZO_LEGAL_DIAS - i.diasDesdeEmissao <= 30).length;
-  if(legalVencido) frases.push(fmtInt(legalVencido)+' nota(s) já passaram do prazo legal de '+PRAZO_LEGAL_DIAS+' dias para manifestação — a SEFAZ considera a operação confirmada tacitamente.');
-  if(legalPerto) frases.push(fmtInt(legalPerto)+' nota(s) estão a menos de 30 dias do prazo legal de '+PRAZO_LEGAL_DIAS+' dias para manifestação.');
   const venceHoje = g.prazo.filter(i=>i.diasDesdeEmissao >= state.prazoLimite).length;
   if(venceHoje) frases.push(fmtInt(venceHoje)+' nota(s) no prazo vencem hoje e entram em atraso amanhã.');
   if(atras.length){
@@ -3056,7 +2826,6 @@ function describeNotasFilters(){
   if(f.status==='atraso') parts.push('Status: Em Atraso');
   else if(f.status==='prazo') parts.push('Status: No Prazo');
   else if(f.status==='semdata') parts.push('Status: Sem data de emissão');
-  if(f.status==='legal') parts.push('Prazo legal de '+PRAZO_LEGAL_DIAS+' dias em até 30 dias ou vencido');
   if(['critico','alto','recente'].includes(f.status)) parts.push('Situação: '+PDF_GRUPO[f.status].titulo+' ('+PDF_GRUPO[f.status].desc()+')');
   if(f.mes && f.mes!=='all') parts.push('Emissão em '+monthLabel(f.mes).toLowerCase());
   if(f.obs==='com') parts.push('Somente notas com observação');
@@ -3099,48 +2868,6 @@ function buildNotasReportPDF(){
   pdfDrawSecoes(doc, {x:marginX, y, width, pageH, grupos:av.g, ids, cols, onNewPage:newPage});
   drawPdfFooter(doc, {pageW, pageH, marginX});
   return doc;
-}
-
-// Exporta a lista filtrada (mesma ordem da tela) para Excel, com observações e prazo legal
-function exportNotasExcel(){
-  if(typeof XLSX === 'undefined'){ showToast('A biblioteca de planilhas não carregou. Recarregue a página.'); return; }
-  const lista = state.notasView;
-  if(!lista.length){ showToast('Nenhuma nota no filtro atual para exportar'); return; }
-  const situacao = i => i.resolvida ? 'Resolvida' : PDF_GRUPO[pdfGrupo(i)].titulo;
-  // Datas como número de série do Excel calculado pelo dia/mês/ano local
-  // (evita a data "voltar um dia" por causa do fuso horário)
-  const serial = d => d ? (Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) - Date.UTC(1899,11,30)) / 86400000 : '';
-  const somaDias = (d, n) => d ? new Date(d.getFullYear(), d.getMonth(), d.getDate()+n) : null;
-  const linhas = lista.map(i=>({
-    'Nota fiscal': i.numeroNF,
-    'Emissão': serial(i.dataEmissao),
-    'Remetente': i.nomeRemetente,
-    'CNPJ remetente': i.cnpjRemetenteFmt,
-    'Loja (destinatário)': i.nomeDestinatario,
-    'CNPJ loja': i.cnpjDestinatarioFmt,
-    'Valor (R$)': i.valor!=null ? i.valor : '',
-    'Situação': situacao(i),
-    'Dias desde a emissão': i.diasDesdeEmissao!=null ? i.diasDesdeEmissao : '',
-    'Dias em atraso': i.emAtraso ? i.diasEmAtraso : 0,
-    'Prazo legal (90 dias)': serial(somaDias(i.dataEmissao, PRAZO_LEGAL_DIAS)),
-    'Dias para o prazo legal': i.prazoLegalRest!=null ? i.prazoLegalRest : '',
-    'Observação': getObs(i).trim(),
-    'Entrou na base em': serial(i.primeiraVez),
-    'Resolvida em': serial(i.resolvidaEm)
-  }));
-  const ws = XLSX.utils.json_to_sheet(linhas);
-  // formatos: colunas de data (B, K, N, O) e valor (G)
-  const range = XLSX.utils.decode_range(ws['!ref']);
-  for(let r = 1; r <= range.e.r; r++){
-    ['B','K','N','O'].forEach(col=>{ const c = ws[col+(r+1)]; if(c && c.t==='n') c.z = 'dd/mm/yyyy'; });
-    const v = ws['G'+(r+1)]; if(v && v.t==='n') v.z = '#,##0.00';
-  }
-  ws['!cols'] = [12,11,22,19,24,19,12,16,10,10,12,10,50,12,12].map(w=>({wch:w}));
-  ws['!autofilter'] = { ref: ws['!ref'] };
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, 'Notas');
-  XLSX.writeFile(wb, 'Notas_Fiscais_'+todayStamp()+'.xlsx');
-  showToast('Excel gerado: '+fmtInt(lista.length)+' nota(s)');
 }
 
 async function downloadNotasReportPDF(){
@@ -3770,10 +3497,6 @@ document.getElementById('dash-month').addEventListener('change', e=>{
 document.getElementById('dashboard-content').addEventListener('click', e=>{
   const sev = e.target.closest('[data-sev]');
   if(sev){ goToNotas({status: sev.dataset.sev==='prazo' ? 'prazo' : sev.dataset.sev}); return; }
-  const q = e.target.closest('[data-queue]');
-  if(q){ state.queueSort = q.dataset.queue; renderQueue(); return; }
-  const res = e.target.closest('[data-loja-res]');
-  if(res){ goToNotas({loja: res.dataset.lojaRes, status:'resolvida'}); return; }
   const loja = e.target.closest('[data-loja]');
   if(loja){ goToNotas({loja: loja.dataset.loja, status:'atraso'}); return; }
   const emp = e.target.closest('.bar-row[data-empresa]:not(.is-zero)');
@@ -3891,7 +3614,6 @@ document.getElementById('pdf-generate-dashboard-btn').addEventListener('click', 
 document.getElementById('export-dashboard-pdf-btn').addEventListener('click', downloadDashboardPDF);
 document.getElementById('pdf-generate-notas-btn').addEventListener('click', downloadNotasReportPDF);
 document.getElementById('notas-export-pdf-btn').addEventListener('click', downloadNotasReportPDF);
-document.getElementById('notas-export-xlsx-btn').addEventListener('click', exportNotasExcel);
 
 /* ==========================================================================
    17a. APARÊNCIA — claro / escuro / seguir o sistema (salvo neste navegador)
