@@ -511,6 +511,25 @@ details.master-details[open] summary{margin-bottom:14px;}
 .obs-input[readonly]{background:var(--bg);cursor:default;}
 .obs-input[readonly]:focus{box-shadow:none;border-color:var(--line);}
 
+/* ================= Filtro com seleção múltipla (empresas) ================= */
+.multi{position:relative;min-width:0;}
+.multi-btn{display:flex;align-items:center;justify-content:space-between;gap:8px;text-align:left;cursor:pointer;}
+.multi-btn svg{width:14px;height:14px;flex:none;color:var(--ink-soft);}
+.multi-text{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.multi-btn.is-active{border-color:var(--accent);color:var(--heading);font-weight:700;}
+.multi-panel{
+  position:absolute;z-index:30;top:calc(100% + 6px);left:0;min-width:100%;width:max-content;max-width:320px;
+  background:var(--card);border:1px solid var(--line);border-radius:10px;box-shadow:var(--shadow-md);padding:6px;
+}
+.multi-actions{display:flex;justify-content:space-between;gap:8px;padding:4px 6px 8px;border-bottom:1px solid var(--line-soft);margin-bottom:4px;}
+.multi-actions button{border:none;background:none;padding:0;font-size:12px;font-weight:700;color:var(--accent);text-decoration:underline;text-underline-offset:2px;}
+.multi-list{max-height:280px;overflow-y:auto;}
+.multi-opt{display:flex;align-items:center;gap:9px;padding:7px 8px;border-radius:7px;font-size:13px;color:var(--ink);cursor:pointer;}
+.multi-opt:hover{background:var(--bg);}
+.multi-opt input{accent-color:var(--teal-dark);width:15px;height:15px;margin:0;flex:none;}
+.multi-opt span{flex:1;white-space:nowrap;}
+.multi-opt small{font-size:11px;color:var(--ink-faint);font-weight:700;font-variant-numeric:tabular-nums;}
+
 /* ================= Melhorias: movimento, evolução, tempo de confirmação ================= */
 .update-strip{
   display:flex;align-items:center;justify-content:space-between;gap:10px 18px;flex-wrap:wrap;
@@ -1026,8 +1045,14 @@ details.master-details[open] summary{margin-bottom:14px;}
               </div>
             </div>
             <div class="field">
-              <label class="field-label" for="notas-filter-empresa">Empresa remetente</label>
-              <select class="select" id="notas-filter-empresa"></select>
+              <span class="field-label" id="notas-empresa-label">Empresa remetente</span>
+              <div class="multi" id="notas-filter-empresa">
+                <button type="button" class="select multi-btn" aria-haspopup="true" aria-expanded="false" aria-labelledby="notas-empresa-label"><span class="multi-text">Todas as empresas</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m6 9 6 6 6-6" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+                <div class="multi-panel" hidden>
+                  <div class="multi-actions"><button type="button" data-multi="all">Marcar todas</button><button type="button" data-multi="none">Limpar</button></div>
+                  <div class="multi-list" role="group" aria-label="Empresas remetentes"></div>
+                </div>
+              </div>
             </div>
             <div class="field">
               <label class="field-label" for="notas-filter-loja">Loja destinatária</label>
@@ -1666,7 +1691,7 @@ const state = {
   dash: { invoices:[], resolvidas:[], companyAgg:[], storeAgg:[], invalidDateCount:0 },
   companyAgg: [],
   storeAgg: [],
-  notasFilters: { empresa:'all', loja:'all', status:'all', obs:'all', mes:'all', search:'' },
+  notasFilters: { empresas:[], loja:'all', status:'all', obs:'all', mes:'all', search:'' },
   notasSort: { col:'diasDesdeEmissao', dir:'desc' },
   notasView: [],      // lista filtrada + ordenada exibida na aba Notas
   notasShown: 0,      // quantas linhas dela já estão no DOM (rolagem contínua)
@@ -2017,7 +2042,7 @@ function sevDoDia(d){
 
 // Abre a aba Notas já filtrada (drill-down a partir do dashboard)
 function goToNotas(f){
-  state.notasFilters = Object.assign({ empresa:'all', loja:'all', status:'all', obs:'all', mes:state.dashMonth, search:'' }, f);
+  state.notasFilters = Object.assign({ empresas:[], loja:'all', status:'all', obs:'all', mes:state.dashMonth, search:'' }, f);
   document.getElementById('notas-search').value = '';
   document.getElementById('notas-filter-status').value = state.notasFilters.status;
   document.getElementById('notas-filter-obs').value = 'all';
@@ -2332,7 +2357,7 @@ function getFilteredNotas(){
   const f = state.notasFilters;
   // "Resolvidas" olha a base inteira; os demais filtros olham só as pendentes
   let list = f.status==='resolvida' ? state.allInvoices.filter(i=>i.resolvida) : state.invoices;
-  if(f.empresa !== 'all') list = list.filter(i=>i.nomeRemetente===f.empresa);
+  if(f.empresas.length) list = list.filter(i=>f.empresas.includes(i.nomeRemetente));
   if(f.loja !== 'all') list = list.filter(i=>i.nomeDestinatario===f.loja);
   if(f.status==='atraso') list = list.filter(i=>i.emAtraso);
   else if(f.status==='prazo') list = list.filter(i=>!i.emAtraso && i.dataEmissao);
@@ -2422,9 +2447,31 @@ function appendNotasRows(){
     : '';
 }
 
+// Filtro de empresas com seleção múltipla (lista vazia = todas as empresas)
+function renderEmpresaMulti(){
+  const box = document.getElementById('notas-filter-empresa');
+  const nomes = state.companyAgg.map(c=>c.nome);
+  const f = state.notasFilters;
+  f.empresas = f.empresas.filter(n=>nomes.includes(n));     // descarta empresas que não existem mais na base
+  box.querySelector('.multi-list').innerHTML = state.companyAgg.map(c=>
+    '<label class="multi-opt"><input type="checkbox" value="'+escapeHtml(c.nome)+'"'+(f.empresas.includes(c.nome)?' checked':'')+'>'+
+    '<span>'+escapeHtml(c.nome)+'</span><small>'+fmtInt(c.total)+'</small></label>'
+  ).join('') || '<p class="empty-note">Nenhuma empresa na base.</p>';
+  const txt = !f.empresas.length ? 'Todas as empresas' : f.empresas.length===1 ? f.empresas[0] : fmtInt(f.empresas.length)+' empresas';
+  const btn = box.querySelector('.multi-btn');
+  btn.querySelector('.multi-text').textContent = txt;
+  btn.title = f.empresas.length ? f.empresas.join(', ') : 'Todas as empresas';
+  btn.classList.toggle('is-active', f.empresas.length>0);
+}
+function setMultiOpen(open){
+  const box = document.getElementById('notas-filter-empresa');
+  box.querySelector('.multi-panel').hidden = !open;
+  box.querySelector('.multi-btn').setAttribute('aria-expanded', String(open));
+}
+
 function renderNotasTab(){
   // Mantém os selects e o estado em sincronia (se a loja/empresa filtrada não existe mais, volta para "todas")
-  state.notasFilters.empresa = populateSelect('notas-filter-empresa', ['all',...state.companyAgg.map(c=>c.nome)], v=>v==='all'?'Todas as empresas':v, state.notasFilters.empresa);
+  renderEmpresaMulti();
   state.notasFilters.loja = populateSelect('notas-filter-loja', ['all',...state.storeAgg.map(s=>s.nome)], v=>v==='all'?'Todas as lojas':v, state.notasFilters.loja);
   const meses = [...new Set(state.allInvoices.map(i=>monthKey(i.dataEmissao)).filter(Boolean))].sort().reverse();
   state.notasFilters.mes = populateSelect('notas-filter-mes', ['all',...meses], v=>v==='all'?'Todos os meses':monthLabel(v), state.notasFilters.mes);
@@ -3004,7 +3051,7 @@ function downloadDashboardPDF(){
 function describeNotasFilters(){
   const f = state.notasFilters;
   const parts = [];
-  if(f.empresa!=='all') parts.push('Empresa: '+f.empresa);
+  if(f.empresas.length) parts.push((f.empresas.length>1?'Empresas: ':'Empresa: ')+f.empresas.join(', '));
   if(f.loja!=='all') parts.push('Loja: '+f.loja);
   if(f.status==='atraso') parts.push('Status: Em Atraso');
   else if(f.status==='prazo') parts.push('Status: No Prazo');
@@ -3730,7 +3777,7 @@ document.getElementById('dashboard-content').addEventListener('click', e=>{
   const loja = e.target.closest('[data-loja]');
   if(loja){ goToNotas({loja: loja.dataset.loja, status:'atraso'}); return; }
   const emp = e.target.closest('.bar-row[data-empresa]:not(.is-zero)');
-  if(emp){ goToNotas({empresa: emp.dataset.empresa}); return; }
+  if(emp){ goToNotas({empresas: [emp.dataset.empresa]}); return; }
   const st = e.target.closest('[data-notas-status]');
   if(st){ goToNotas({status: st.dataset.notasStatus}); }
 });
@@ -3751,11 +3798,33 @@ document.getElementById('notas-search').addEventListener('input', e=>{
   clearTimeout(notasSearchTimer);
   notasSearchTimer = setTimeout(renderNotasTab, 150);
 });
-[['notas-filter-empresa','empresa'],['notas-filter-loja','loja'],['notas-filter-status','status'],['notas-filter-obs','obs'],['notas-filter-mes','mes']].forEach(([id,key])=>{
+[['notas-filter-loja','loja'],['notas-filter-status','status'],['notas-filter-obs','obs'],['notas-filter-mes','mes']].forEach(([id,key])=>{
   document.getElementById(id).addEventListener('change', e=>{ state.notasFilters[key] = e.target.value; renderNotasTab(); });
 });
+// Empresas: abre/fecha a lista, marca várias, "Marcar todas" e "Limpar"
+(function(){
+  const box = document.getElementById('notas-filter-empresa');
+  box.querySelector('.multi-btn').addEventListener('click', ()=>setMultiOpen(box.querySelector('.multi-panel').hidden));
+  box.querySelector('.multi-list').addEventListener('change', e=>{
+    const cb = e.target.closest('input[type="checkbox"]');
+    if(!cb) return;
+    const f = state.notasFilters;
+    f.empresas = cb.checked ? [...new Set([...f.empresas, cb.value])] : f.empresas.filter(n=>n!==cb.value);
+    renderNotasTab();
+  });
+  box.querySelector('.multi-actions').addEventListener('click', e=>{
+    const b = e.target.closest('[data-multi]');
+    if(!b) return;
+    state.notasFilters.empresas = b.dataset.multi==='all' ? state.companyAgg.map(c=>c.nome) : [];
+    renderNotasTab();
+  });
+  // fecha ao clicar fora (ignora cliques em itens da lista que acabaram de ser redesenhados)
+  document.addEventListener('click', e=>{ if(e.target.isConnected && !box.contains(e.target)) setMultiOpen(false); });
+  document.addEventListener('keydown', e=>{ if(e.key==='Escape') setMultiOpen(false); });
+})();
+
 document.getElementById('notas-clear-filters').addEventListener('click', ()=>{
-  state.notasFilters = { empresa:'all', loja:'all', status:'all', obs:'all', mes:'all', search:'' };
+  state.notasFilters = { empresas:[], loja:'all', status:'all', obs:'all', mes:'all', search:'' };
   document.getElementById('notas-search').value = '';
   document.getElementById('notas-filter-status').value = 'all';
   document.getElementById('notas-filter-obs').value = 'all';
